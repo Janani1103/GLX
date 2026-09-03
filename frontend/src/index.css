@@ -1,0 +1,266 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  /* Prevent layout shifts from scrollbar appearance */
+  overflow-y: scroll;
+  /* Smooth scroll globally */
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  /* Minimum font size baseline for readability */
+  font-size: 14px;
+  /* Remove tap highlight on mobile */
+  -webkit-tap-highlight-color: transparent;
+  /* Prevent text size adjust on orientation change */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Ensure touch targets are always at least 44px */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Full bleed mobile - safe area support for notched phones */
+.safe-top    { padding-top:    env(safe-area-inset-top, 0px); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-left   { padding-left:   env(safe-area-inset-left, 0px); }
+.safe-right  { padding-right:  env(safe-area-inset-right, 0px); }
+
+/* Prevent input zoom on iOS (must be font-size >= 16px) */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="date"],
+input[type="time"],
+select,
+textarea {
+  font-size: 16px !important;
+}
+
+/* Print styles */
+@media print {
+  /* Fix Blank Print Preview */
+  html, body {
+    visibility: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Hide navigation, sidebar, headers, buttons, and app shell non-printable elements */
+  aside,
+  nav, 
+  header,
+  .no-print, 
+  .sidebar-container, 
+  .app-sidebar, 
+  .app-header, 
+  button, 
+  .modal-backdrop {
+    display: none !important;
+  }
+
+  /* Reset layout of all ancestor/parent containers to allow 100% full-width printing */
+  #root, 
+  .app-layout, 
+  .main-content, 
+  .page-container,
+  .fixed.inset-0.z-50, 
+  .fixed.inset-0.z-50 > div,
+  .fixed.inset-0.z-50 > div > div {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  /* Quotation & Document print container visibility & position */
+  .quotation-print-area,
+  .print-area,
+  .print-container,
+  .document-print-view {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    visibility: visible !important;
+    display: block !important;
+    box-shadow: none !important;
+  }
+
+  .print-page {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    margin: 0 0 10mm 0 !important;
+    padding: 20px !important;
+    background: #ffffff !important;
+    border: 1px solid #9ca3af !important;
+    border-radius: 8px !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    min-height: 252mm !important;
+  }
+
+  .print-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+    margin-bottom: 0 !important;
+  }
+
+  .quotation-print-area *,
+  .print-area *,
+  .print-container *,
+  .document-print-view *,
+  .print-page * {
+    visibility: visible !important;
+  }
+
+  /* Page Break / Layout Split Fix */
+  @page {
+    size: A4 portrait;
+    margin: 10mm 8mm;
+  }
+
+  /* Table rows, headers, bank details, and sections avoiding breaks */
+  .quotation-header,
+  .quotation-card,
+  .bank-details,
+  .print-header,
+  .print-footer,
+  .print-avoid-break,
+  .avoid-break,
+  table,
+  tr,
+  tbody tr,
+  .print-table-row {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  .print-only-container {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    display: block !important;
+    visibility: visible !important;
+  }
+  
+  .print-only-container * {
+    visibility: visible !important;
+  }
+}
+
+@layer utilities {
+  /* Mobile responsive utility classes */
+  .mobile-card {
+    @apply rounded-xl border border-gray-200 bg-white shadow-sm p-3;
+  }
+
+  /* Stack children vertically on mobile, horizontally on sm+ */
+  .responsive-row {
+    @apply flex flex-col sm:flex-row gap-2 sm:gap-3;
+  }
+
+  /* Horizontal overflow safe — prevents layout breaks on mobile */
+  .overflow-x-safe {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Full width on mobile only */
+  .mobile-full {
+    @apply w-full sm:w-auto;
+  }
+
+  /* Table wrapper for horizontal scroll on mobile */
+  .table-mobile-wrapper {
+    @apply overflow-x-auto -mx-3 sm:mx-0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Filter bar — stacks on mobile */
+  .filter-bar {
+    @apply flex flex-col sm:flex-row flex-wrap gap-2;
+  }
+
+  /* Grid responsive patterns */
+  .grid-responsive-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2;
+  }
+  .grid-responsive-3 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  }
+  .grid-responsive-4 {
+    @apply grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4;
+  }
+  .grid-kpi {
+    @apply grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4;
+  }
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Off-screen layout container for background high-DPI HTML canvas rendering */
+.print-only-container {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: 850px;
+  background: white;
+}
