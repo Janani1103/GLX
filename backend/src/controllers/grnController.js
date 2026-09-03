@@ -179,224 +179,221 @@ export const approveGrnQA = asyncHandler(async (req, res) => {
         po = await PurchaseOrder.findById(grn.purchaseOrderId);
     }
 
-    const session = await mongoose.startSession();
     try {
-        await session.withTransaction(async () => {
-            const approvalsMap = new Map(itemApprovals.map(i => [i._id.toString(), i]));
-            let totalPayable = 0;
+        const approvalsMap = new Map(itemApprovals.map(i => [i._id.toString(), i]));
+        let totalPayable = 0;
 
-            for (const grnItem of grn.items) {
-                const approval = approvalsMap.get(grnItem._id.toString());
-                if (!approval) {
-                    throw new Error(`QA inspection details missing for product: ${grnItem.productName}`);
+        for (const grnItem of grn.items) {
+            const approval = approvalsMap.get(grnItem._id.toString());
+            if (!approval) {
+                throw new Error(`QA inspection details missing for product: ${grnItem.productName}`);
+            }
+
+            const acceptedQty = Number(approval.acceptedQuantity) || 0;
+            const rejectedQty = Number(approval.rejectedQuantity) || 0;
+
+            grnItem.acceptedQuantity = acceptedQty;
+            grnItem.rejectedQuantity = rejectedQty;
+            grnItem.qcStatus = rejectedQty > 0 ? 'failed' : 'approved';
+            grnItem.rejectionReason = approval.rejectionReason;
+
+            // 1. Generate Julian Tracking Batch Code
+            let codePrefix = 'SUP';
+            if (grn.sourceType === 'own_farm' && farm) {
+                codePrefix = farm.farmCode || farm.name;
+            } else if (supplier) {
+                codePrefix = supplier.supplierShortCode || supplier.supplierCode || 'SUP';
+            }
+            const ProductModel = mongoose.model('Product');
+            const productObj = await ProductModel.findById(grnItem.productId);
+            const prodShort = productObj?.productShortCode || 'PRD';
+            const uniqueSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const batchCode = `${generateJulianBatchCode(`${codePrefix}-${prodShort}`, grn.receiptDate)}-${uniqueSuffix}`;
+            grnItem.batchNumber = approval.batchNumber || batchCode;
+
+            totalPayable += acceptedQty * grnItem.unitPrice;
+
+            // 2. Increase stock for accepted quantity
+            if (acceptedQty > 0) {
+                const result = await increaseStock({
+                    productId: grnItem.productId,
+                    warehouseId: grn.warehouseId,
+                    quantity: acceptedQty,
+                    costPerUnit: grnItem.unitPrice,
+                    movementType: 'purchase_receipt',
+                    batchNumber: grnItem.batchNumber,
+                    sourceDocument: {
+                        type: 'purchase_receipt',
+                        id: grn._id,
+                        number: grn.grnNumber,
+                    },
+                    reason: `QA Approved material intake. Batch: ${grnItem.batchNumber}`,
+                    userId: req.user._id,
+                });
+                grnItem.stockMovementId = result.movement._id;
+            }
+
+            // 3. Update PO received quantity
+            if (po && grnItem.poLineItemId) {
+                const poLine = po.items.id(grnItem.poLineItemId);
+                if (poLine) {
+                    poLine.receivedQuantity = (poLine.receivedQuantity || 0) + acceptedQty;
                 }
+            }
+        }
 
-                const acceptedQty = Number(approval.acceptedQuantity) || 0;
-                const rejectedQty = Number(approval.rejectedQuantity) || 0;
+        // 4. Financial Splitting Calculations
+        const balanceDue = totalPayable - paidAmountLKR;
 
-                grnItem.acceptedQuantity = acceptedQty;
-                grnItem.rejectedQuantity = rejectedQty;
-                grnItem.qcStatus = rejectedQty > 0 ? 'failed' : 'approved';
-                grnItem.rejectionReason = approval.rejectionReason;
+        grn.totalPayableLKR = +totalPayable.toFixed(2);
+        grn.paidAmountLKR = +Number(paidAmountLKR).toFixed(2);
+        grn.balanceDueLKR = +balanceDue.toFixed(2);
+        grn.status = 'approved';
 
-                // 1. Generate Julian Tracking Batch Code
-                let codePrefix = 'SUP';
-                if (grn.sourceType === 'own_farm' && farm) {
-                    codePrefix = farm.farmCode || farm.name;
-                } else if (supplier) {
-                    codePrefix = supplier.supplierShortCode || supplier.supplierCode || 'SUP';
-                }
-                const ProductModel = mongoose.model('Product');
-                const productObj = await ProductModel.findById(grnItem.productId);
-                const prodShort = productObj?.productShortCode || 'PRD';
-                const uniqueSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-                const batchCode = `${generateJulianBatchCode(`${codePrefix}-${prodShort}`, grn.receiptDate)}-${uniqueSuffix}`;
-                grnItem.batchNumber = approval.batchNumber || batchCode;
+        // Save GRN and PO
+        await grn.save();
 
-                totalPayable += acceptedQty * grnItem.unitPrice;
+        // Auto-generate Bill from GRN
+        const billItems = grn.items
+            .filter(gi => gi.acceptedQuantity > 0)
+            .map(gi => ({
+                productId: gi.productId,
+                productCode: gi.productCode,
+                productName: gi.productName,
+                quantity: gi.acceptedQuantity,
+                unitOfMeasure: gi.unitOfMeasure,
+                unitPrice: gi.unitPrice,
+                taxRate: 0,
+                taxable: false,
+                grnLineItemId: gi._id,
+            }));
 
-                // 2. Increase stock for accepted quantity
-                if (acceptedQty > 0) {
-                    const result = await increaseStock({
-                        productId: grnItem.productId,
-                        warehouseId: grn.warehouseId,
-                        quantity: acceptedQty,
-                        costPerUnit: grnItem.unitPrice,
-                        movementType: 'purchase_receipt',
-                        batchNumber: grnItem.batchNumber,
-                        sourceDocument: {
-                            type: 'purchase_receipt',
-                            id: grn._id,
-                            number: grn.grnNumber,
-                        },
-                        reason: `QA Approved material intake. Batch: ${grnItem.batchNumber}`,
-                        userId: req.user._id,
-                        session,
-                    });
-                    grnItem.stockMovementId = result.movement._id;
-                }
+        let bill = null;
+        if (billItems.length > 0) {
+            let finalDueDate = grn.receiptDate || new Date();
+            let paymentTermsType = 'cash';
+            let creditDays = 0;
 
-                // 3. Update PO received quantity
-                if (po && grnItem.poLineItemId) {
-                    const poLine = po.items.id(grnItem.poLineItemId);
-                    if (poLine) {
-                        poLine.receivedQuantity = (poLine.receivedQuantity || 0) + acceptedQty;
-                    }
+            if (supplier) {
+                paymentTermsType = supplier.paymentTerms?.type || 'credit';
+                creditDays = supplier.paymentTerms?.creditDays || 0;
+                if (paymentTermsType === 'credit') {
+                    const d = new Date(finalDueDate);
+                    d.setDate(d.getDate() + creditDays);
+                    finalDueDate = d;
                 }
             }
 
-            // 4. Financial Splitting Calculations
-            const balanceDue = totalPayable - paidAmountLKR;
+            bill = new Bill({
+                supplierInvoiceNumber: grn.grnNumber,
+                supplierId: supplier ? supplier._id : null,
+                supplierSnapshot: {
+                    name: supplier ? supplier.displayName : (grn.farmName || 'Own Farm'),
+                    code: supplier ? (supplier.supplierShortCode || supplier.supplierCode || 'SUP') : (farm ? (farm.farmCode || 'FRM') : 'FRM'),
+                    taxRegistrationNumber: supplier ? supplier.taxRegistrationNumber : undefined,
+                },
+                purchaseOrderIds: po ? [po._id] : [],
+                purchaseOrderNumbers: po && po.poNumber ? [po.poNumber] : [],
+                grnIds: [grn._id],
+                grnNumbers: [grn.grnNumber],
+                billDate: grn.receiptDate || new Date(),
+                dueDate: finalDueDate,
+                paymentTerms: {
+                    type: paymentTermsType,
+                    creditDays: creditDays,
+                },
+                items: billItems,
+                amountPaid: grn.paidAmountLKR || 0,
+                status: 'approved',
+                approvedBy: req.user._id,
+                approvedAt: new Date(),
+                createdBy: req.user._id,
+            });
 
-            grn.totalPayableLKR = +totalPayable.toFixed(2);
-            grn.paidAmountLKR = +Number(paidAmountLKR).toFixed(2);
-            grn.balanceDueLKR = +balanceDue.toFixed(2);
-            grn.status = 'approved';
+            await bill.save();
 
-            // Save GRN and PO
-            await grn.save({ session });
-
-            // Auto-generate Bill from GRN
-            const billItems = grn.items
-                .filter(gi => gi.acceptedQuantity > 0)
-                .map(gi => ({
-                    productId: gi.productId,
-                    productCode: gi.productCode,
-                    productName: gi.productName,
-                    quantity: gi.acceptedQuantity,
-                    unitOfMeasure: gi.unitOfMeasure,
-                    unitPrice: gi.unitPrice,
-                    taxRate: 0,
-                    taxable: false,
-                    grnLineItemId: gi._id,
-                }));
-
-            if (billItems.length > 0) {
-                let finalDueDate = grn.receiptDate || new Date();
-                let paymentTermsType = 'cash';
-                let creditDays = 0;
-
-                if (supplier) {
-                    paymentTermsType = supplier.paymentTerms?.type || 'credit';
-                    creditDays = supplier.paymentTerms?.creditDays || 0;
-                    if (paymentTermsType === 'credit') {
-                        const d = new Date(finalDueDate);
-                        d.setDate(d.getDate() + creditDays);
-                        finalDueDate = d;
-                    }
+            if (paymentType === 'paid' && paidAmountLKR > 0 && paymentMethod) {
+                const isChequePending = paymentMethod === 'cheque' && chequeStatus !== 'cleared';
+                
+                if (bankAccountId && paymentMethod !== 'cash' && !isChequePending) {
+                    const bankAccount = await BankAccount.findById(bankAccountId);
+                    if (!bankAccount) throw new Error('Company bank/cash account not found');
+                    bankAccount.balance = +(bankAccount.balance - paidAmountLKR).toFixed(2);
+                    await bankAccount.save();
                 }
 
-                const bill = new Bill({
-                    supplierInvoiceNumber: grn.grnNumber,
-                    supplierId: supplier ? supplier._id : null,
-                    supplierSnapshot: {
-                        name: supplier ? supplier.displayName : (grn.farmName || 'Own Farm'),
-                        code: supplier ? (supplier.supplierShortCode || supplier.supplierCode || 'SUP') : (farm ? (farm.farmCode || 'FRM') : 'FRM'),
-                        taxRegistrationNumber: supplier ? supplier.taxRegistrationNumber : undefined,
-                    },
-                    purchaseOrderIds: po ? [po._id] : [],
-                    purchaseOrderNumbers: po && po.poNumber ? [po.poNumber] : [],
-                    grnIds: [grn._id],
-                    grnNumbers: [grn.grnNumber],
-                    billDate: grn.receiptDate || new Date(),
-                    dueDate: finalDueDate,
-                    paymentTerms: {
-                        type: paymentTermsType,
-                        creditDays: creditDays,
-                    },
-                    items: billItems,
-                    amountPaid: grn.paidAmountLKR || 0,
-                    status: 'approved',
-                    approvedBy: req.user._id,
-                    approvedAt: new Date(),
+                const payment = new Payment({
+                    direction: 'paid',
+                    supplierId: grn.supplierId || undefined,
+                    bankAccountId: paymentMethod !== 'cash' ? (bankAccountId || undefined) : undefined,
+                    amount: paidAmountLKR,
+                    method: paymentMethod,
+                    chequeNumber: paymentMethod === 'cheque' ? chequeNumber : undefined,
+                    chequeDate: paymentMethod === 'cheque' && chequeDate ? new Date(chequeDate) : undefined,
+                    chequeStatus: paymentMethod === 'cheque' ? (chequeStatus || 'pending') : undefined,
+                    bankName: paymentMethod === 'cheque' ? bankName : undefined,
+                    transactionReference: paymentMethod !== 'cheque' && paymentMethod !== 'cash' ? paymentReference : undefined,
+                    partyName: supplier ? supplier.displayName : (grn.farmName || 'Own Farm'),
+                    allocations: [{
+                        documentType: 'bill',
+                        documentId: bill._id,
+                        documentNumber: bill.billNumber,
+                        amount: paidAmountLKR,
+                    }],
+                    receivedBy: req.user._id,
                     createdBy: req.user._id,
                 });
-
-                await bill.save({ session });
-
-                if (paymentType === 'paid' && paidAmountLKR > 0 && paymentMethod) {
-                    const isChequePending = paymentMethod === 'cheque' && chequeStatus !== 'cleared';
-                    
-                    if (bankAccountId && paymentMethod !== 'cash' && !isChequePending) {
-                        const bankAccount = await BankAccount.findById(bankAccountId).session(session);
-                        if (!bankAccount) throw new Error('Company bank/cash account not found');
-                        bankAccount.balance = +(bankAccount.balance - paidAmountLKR).toFixed(2);
-                        await bankAccount.save({ session });
-                    }
-
-                    const payment = new Payment({
-                        direction: 'paid',
-                        supplierId: grn.supplierId || undefined,
-                        bankAccountId: paymentMethod !== 'cash' ? (bankAccountId || undefined) : undefined,
-                        amount: paidAmountLKR,
-                        method: paymentMethod,
-                        chequeNumber: paymentMethod === 'cheque' ? chequeNumber : undefined,
-                        chequeDate: paymentMethod === 'cheque' && chequeDate ? new Date(chequeDate) : undefined,
-                        chequeStatus: paymentMethod === 'cheque' ? (chequeStatus || 'pending') : undefined,
-                        bankName: paymentMethod === 'cheque' ? bankName : undefined,
-                        transactionReference: paymentMethod !== 'cheque' && paymentMethod !== 'cash' ? paymentReference : undefined,
-                        partyName: supplier ? supplier.displayName : (grn.farmName || 'Own Farm'),
-                        allocations: [{
-                            documentType: 'bill',
-                            documentId: bill._id,
-                            documentNumber: bill.billNumber,
-                            amount: paidAmountLKR,
-                        }],
-                        receivedBy: req.user._id,
-                        createdBy: req.user._id,
-                    });
-                    await payment.save({ session });
+                await payment.save();
+            }
+        }
+        
+        // Check PO status
+        if (po) {
+            let allReceived = true;
+            po.items.forEach(i => {
+                if ((i.receivedQuantity || 0) < i.orderedQuantity) {
+                    allReceived = false;
                 }
+            });
+            po.status = allReceived ? 'received' : 'partially_received';
+            po.grns = [...(po.grns || []), grn._id];
+            await po.save();
+        }
+
+        // 5. Update Supplier Accounts Payable ledger
+        if (supplier) {
+            supplier.balanceDueLKR = +( (supplier.balanceDueLKR || 0) + balanceDue ).toFixed(2);
+            await supplier.save();
+        }
+
+        // 6. Broadcast Real-Time Stock & Balance via Socket.io
+        try {
+            const io = getIO();
+            if (supplier) {
+                // Emit petty cash / supplier balance change
+                io.emit('supplier_balance_update', {
+                    supplierId: supplier._id,
+                    displayName: supplier.displayName,
+                    balanceDueLKR: supplier.balanceDueLKR,
+                });
             }
             
-            // Check PO status
-            if (po) {
-                let allReceived = true;
-                po.items.forEach(i => {
-                    if ((i.receivedQuantity || 0) < i.orderedQuantity) {
-                        allReceived = false;
-                    }
+            // Emit stock threshold check alert
+            io.emit('stock_update', {
+                message: `GRN ${grn.grnNumber} approved. Materials stocked.`,
+            });
+
+            if (paymentType === 'paid' && paidAmountLKR > 0 && bankAccountId) {
+                io.emit('bank_balance_update', {
+                    bankAccountId,
                 });
-                po.status = allReceived ? 'received' : 'partially_received';
-                po.grns = [...(po.grns || []), grn._id];
-                await po.save({ session });
-            }
-
-            // 5. Update Supplier Accounts Payable ledger
-            if (supplier) {
-                supplier.balanceDueLKR = +( (supplier.balanceDueLKR || 0) + balanceDue ).toFixed(2);
-                await supplier.save({ session });
-            }
-
-            // 6. Broadcast Real-Time Stock & Balance via Socket.io
-            try {
-                const io = getIO();
-                if (supplier) {
-                    // Emit petty cash / supplier balance change
-                    io.emit('supplier_balance_update', {
-                        supplierId: supplier._id,
-                        displayName: supplier.displayName,
-                        balanceDueLKR: supplier.balanceDueLKR,
-                    });
-                }
-                
-                // Emit stock threshold check alert
-                io.emit('stock_update', {
-                    message: `GRN ${grn.grnNumber} approved. Materials stocked.`,
+                io.emit('financial_update', {
+                    message: 'Financial accounts updated via GRN payment',
                 });
-
-                if (paymentType === 'paid' && paidAmountLKR > 0 && bankAccountId) {
-                    io.emit('bank_balance_update', {
-                        bankAccountId,
-                    });
-                    io.emit('financial_update', {
-                        message: 'Financial accounts updated via GRN payment',
-                    });
-                }
-            } catch (socketErr) {
-                console.warn('[GRN Approval] Socket broadcast error:', socketErr.message);
             }
-        });
+        } catch (socketErr) {
+            console.warn('[GRN Approval] Socket broadcast error:', socketErr.message);
+        }
 
         const populated = await GoodsReceiptNote.findById(grn._id)
             .populate('purchaseOrderId', 'poNumber')
@@ -414,8 +411,6 @@ export const approveGrnQA = asyncHandler(async (req, res) => {
     } catch (err) {
         res.status(400);
         throw new Error(err.message || 'QA approval failed');
-    } finally {
-        session.endSession();
     }
 });
 

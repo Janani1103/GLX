@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Wrench } from 'lucide-react';
+import { Eye, Wrench, Plus } from 'lucide-react';
 
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
 import Table from '../components/ui/Table';
 import Badge from '../components/ui/Badge';
 import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
 import { useRepairs } from '../features/returns/useReturns';
+import { useAuthStore } from '../store/authStore';
 
 const statusVariant = {
     pending: 'default', in_progress: 'warning', awaiting_parts: 'warning',
@@ -18,6 +20,9 @@ const statusVariant = {
 
 export default function RepairsPage() {
     const navigate = useNavigate();
+    const { user } = useAuthStore();
+    const canCreate = ['admin', 'manager', 'warehouse_manager', 'technician'].includes(user?.role);
+
     const [filters, setFilters] = useState({ status: '', page: 1, limit: 15 });
     const { data, isLoading } = useRepairs(filters);
     const repairs = data?.data || [];
@@ -42,7 +47,12 @@ export default function RepairsPage() {
 
     return (
         <div>
-            <PageHeader title="Repairs Workshop" description="Track items being repaired" />
+            <PageHeader title="Repairs Workshop" description="Track items being repaired"
+                actions={canCreate && (
+                    <Button variant="primary" onClick={() => navigate('/repairs/new')}>
+                        <Plus size={16} className="mr-1.5" /> Add Repair
+                    </Button>
+                )} />
             <Card>
                 <div className="p-4 border-b flex gap-3">
                     <div className="w-48">

@@ -6,12 +6,12 @@ import Product from '../models/Product.js';
 import Warehouse from '../models/Warehouse.js';
 import { getIO } from './socketService.js';
 
-export const checkAndAlertLowStock = async (productId, session) => {
+export const checkAndAlertLowStock = async (productId) => {
     try {
-        const product = await Product.findById(productId).session(session || null);
+        const product = await Product.findById(productId);
         if (product && (product.productType === 'finished_good' || product.productType === 'trading')) {
             // Aggregate total quantities across all warehouses
-            const stockItems = await StockItem.find({ productId }).session(session || null);
+            const stockItems = await StockItem.find({ productId });
             const totalQty = stockItems.reduce((sum, item) => sum + (item.quantities?.onHand || 0), 0);
             
             if (totalQty < 10) {
@@ -45,31 +45,30 @@ export const checkAndAlertLowStock = async (productId, session) => {
  * @param {String} [params.reason]
  * @param {String} [params.notes]
  * @param {ObjectId} params.userId
- * @param {Object} [params.session] - mongoose session for transactions
  */
 export const increaseStock = async ({
     productId, warehouseId, quantity, costPerUnit = 0,
     movementType, batchNumber = null,
-    sourceDocument, reason, notes, userId, session,
+    sourceDocument, reason, notes, userId,
     openQuantity, // new parameter
 }) => {
     if (!quantity || quantity <= 0) throw new Error('Quantity must be greater than 0');
 
-    const product = await Product.findById(productId).session(session || null);
+    const product = await Product.findById(productId);
     if (!product) throw new Error(`Product ${productId} not found`);
 
     if (product.status !== 'active') {
         product.status = 'active';
-        await product.save({ session: session || undefined });
+        await product.save();
     }
 
-    const warehouse = await Warehouse.findById(warehouseId).session(session || null);
+    const warehouse = await Warehouse.findById(warehouseId);
     if (!warehouse) throw new Error(`Warehouse ${warehouseId} not found`);
 
     // Find or create stock item
     let stockItem = await StockItem.findOne({
         productId, warehouseId, batchNumber,
-    }).session(session || null);
+    });
 
     const balanceBefore = stockItem?.quantities?.onHand || 0;
 
@@ -118,8 +117,8 @@ export const increaseStock = async ({
         stockItem.quantities.onHand = stockItem.quantities.openStock + stockItem.quantities.balanceStock;
     }
     stockItem.lastMovementDate = new Date();
-    await stockItem.save({ session: session || undefined });
-    checkAndAlertLowStock(productId, session);
+    await stockItem.save();
+    checkAndAlertLowStock(productId);
 
     // Record movement
     const movement = new StockMovement({
@@ -141,7 +140,7 @@ export const increaseStock = async ({
         notes,
         performedBy: userId,
     });
-    await movement.save({ session: session || undefined });
+    await movement.save();
 
     // Update product's last purchase cost & average cost
     if (movementType === 'purchase_receipt' || movementType === 'opening_stock' || movementType === 'production_receipt') {
@@ -154,8 +153,7 @@ export const increaseStock = async ({
         }
         await Product.findByIdAndUpdate(
             productId,
-            updateDoc,
-            { session: session || null }
+            updateDoc
         );
     }
 
@@ -169,19 +167,19 @@ export const increaseStock = async ({
 export const decreaseStock = async ({
     productId, warehouseId, quantity,
     movementType, batchNumber = null,
-    sourceDocument, reason, notes, userId, session,
+    sourceDocument, reason, notes, userId,
     allowNegative = false,
 }) => {
     if (!quantity || quantity <= 0) throw new Error('Quantity must be greater than 0');
 
-    const product = await Product.findById(productId).session(session || null);
+    const product = await Product.findById(productId);
     if (!product) throw new Error(`Product ${productId} not found`);
 
     // Case 1: Specific batch number requested
     if (batchNumber) {
         let stockItem = await StockItem.findOne({
             productId, warehouseId, batchNumber,
-        }).session(session || null);
+        });
 
         if (!stockItem) {
             if (allowNegative) {
@@ -216,8 +214,8 @@ export const decreaseStock = async ({
         }
         stockItem.quantities.onHand = stockItem.quantities.openStock + (stockItem.quantities.balanceStock || 0);
         stockItem.lastMovementDate = new Date();
-        await stockItem.save({ session: session || undefined });
-        checkAndAlertLowStock(productId, session);
+        await stockItem.save();
+        checkAndAlertLowStock(productId);
 
         const movement = new StockMovement({
             productId,
@@ -239,7 +237,7 @@ export const decreaseStock = async ({
             performedBy: userId,
             createdAt: new Date(),
         });
-        await movement.save({ session: session || undefined });
+        await movement.save();
 
         return { stockItem, movement };
     }
@@ -249,8 +247,7 @@ export const decreaseStock = async ({
         productId,
         warehouseId
     })
-    .sort({ createdAt: 1 })
-    .session(session || null);
+    .sort({ createdAt: 1 });
 
     const totalAvailable = stockItems.reduce((sum, item) => sum + Math.max(0, item.quantities?.openStock || 0), 0);
 
@@ -277,7 +274,7 @@ export const decreaseStock = async ({
         item.quantities.openStock = (item.quantities.openStock || 0) - qtyToDeduct;
         item.quantities.onHand = item.quantities.openStock + (item.quantities.balanceStock || 0);
         item.lastMovementDate = new Date();
-        await item.save({ session: session || undefined });
+        await item.save();
 
         remainingQty -= qtyToDeduct;
         totalCostOfDepleted += qtyToDeduct * item.costPerUnit;
@@ -303,7 +300,7 @@ export const decreaseStock = async ({
             performedBy: userId,
             createdAt: new Date(),
         });
-        await movement.save({ session: session || undefined });
+        await movement.save();
         lastMovement = movement;
     }
 
@@ -327,7 +324,7 @@ export const decreaseStock = async ({
         targetItem.quantities.openStock = (targetItem.quantities.openStock || 0) - remainingQty;
         targetItem.quantities.onHand = targetItem.quantities.openStock + (targetItem.quantities.balanceStock || 0);
         targetItem.lastMovementDate = new Date();
-        await targetItem.save({ session: session || undefined });
+        await targetItem.save();
 
         totalCostOfDepleted += remainingQty * targetItem.costPerUnit;
         lastModifiedStockItem = targetItem;
@@ -352,11 +349,11 @@ export const decreaseStock = async ({
             performedBy: userId,
             createdAt: new Date(),
         });
-        await movement.save({ session: session || undefined });
+        await movement.save();
         lastMovement = movement;
     }
 
-    checkAndAlertLowStock(productId, session);
+    checkAndAlertLowStock(productId);
 
     // Return virtual stock item with weighted average cost of depleted items
     const virtualStockItem = lastModifiedStockItem.toObject ? lastModifiedStockItem.toObject() : { ...lastModifiedStockItem };
@@ -371,11 +368,11 @@ export const decreaseStock = async ({
  */
 export const reserveStock = async ({
     productId, warehouseId, quantity,
-    sourceDocument, userId, session,
+    sourceDocument, userId,
 }) => {
     const stockItem = await StockItem.findOne({
         productId, warehouseId, batchNumber: null,
-    }).session(session || null);
+    });
 
     if (!stockItem) throw new Error(`No stock found for product in selected warehouse`);
 
@@ -387,7 +384,7 @@ export const reserveStock = async ({
     }
 
     stockItem.quantities.reserved += quantity;
-    await stockItem.save({ session: session || undefined });
+    await stockItem.save();
 
     const reservation = new StockReservation({
         productId,
@@ -397,7 +394,7 @@ export const reserveStock = async ({
         sourceDocument,
         reservedBy: userId,
     });
-    await reservation.save({ session: session || undefined });
+    await reservation.save();
 
     return { stockItem, reservation };
 };
@@ -405,28 +402,28 @@ export const reserveStock = async ({
 /**
  * Release reservations for a source document (e.g., when order cancelled).
  */
-export const releaseReservations = async ({ sourceDocumentId, reason = '', session }) => {
+export const releaseReservations = async ({ sourceDocumentId, reason = '' }) => {
     const reservations = await StockReservation.find({
         'sourceDocument.id': sourceDocumentId,
         status: 'active',
-    }).session(session || null);
+    });
 
     for (const r of reservations) {
         const stockItem = await StockItem.findOne({
             productId: r.productId,
             warehouseId: r.warehouseId,
             batchNumber: r.batchNumber,
-        }).session(session || null);
+        });
 
         if (stockItem) {
             stockItem.quantities.reserved = Math.max(0, stockItem.quantities.reserved - r.quantity);
-            await stockItem.save({ session: session || undefined });
+            await stockItem.save();
         }
 
         r.status = 'cancelled';
         r.cancelledAt = new Date();
         r.cancellationReason = reason;
-        await r.save({ session: session || undefined });
+        await r.save();
     }
 
     return reservations.length;
@@ -437,12 +434,12 @@ export const releaseReservations = async ({ sourceDocumentId, reason = '', sessi
  * Releases reservation + decreases onHand stock + creates movement.
  */
 export const fulfillReservations = async ({
-    sourceDocumentId, sourceDocumentNumber, userId, session,
+    sourceDocumentId, sourceDocumentNumber, userId,
 }) => {
     const reservations = await StockReservation.find({
         'sourceDocument.id': sourceDocumentId,
         status: 'active',
-    }).session(session || null);
+    });
 
     for (const r of reservations) {
         // Release reservation
@@ -450,11 +447,11 @@ export const fulfillReservations = async ({
             productId: r.productId,
             warehouseId: r.warehouseId,
             batchNumber: r.batchNumber,
-        }).session(session || null);
+        });
 
         if (stockItem) {
             stockItem.quantities.reserved = Math.max(0, stockItem.quantities.reserved - r.quantity);
-            await stockItem.save({ session: session || undefined });
+            await stockItem.save();
         }
 
         // Decrease stock (dispatch)
@@ -470,12 +467,11 @@ export const fulfillReservations = async ({
                 number: sourceDocumentNumber,
             },
             userId,
-            session,
         });
 
         r.status = 'fulfilled';
         r.fulfilledAt = new Date();
-        await r.save({ session: session || undefined });
+        await r.save();
     }
 
     return reservations.length;

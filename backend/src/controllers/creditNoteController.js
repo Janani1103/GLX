@@ -88,27 +88,19 @@ export const applyCreditNote = asyncHandler(async (req, res) => {
         res.status(400); throw new Error(`Cannot apply more than invoice balance (${invoice.balanceDue})`);
     }
 
-    const session = await mongoose.startSession();
+    cn.applications.push({
+        invoiceId: invoice._id,
+        invoiceNumber: invoice.invoiceNumber,
+        amountApplied: amount,
+        appliedBy: req.user._id,
+    });
+    await cn.save();
 
-    try {
-        await session.withTransaction(async () => {
-            cn.applications.push({
-                invoiceId: invoice._id,
-                invoiceNumber: invoice.invoiceNumber,
-                amountApplied: amount,
-                appliedBy: req.user._id,
-            });
-            await cn.save({ session });
+    invoice.amountPaid = +(invoice.amountPaid + amount).toFixed(2);
+    invoice.lastPaymentDate = new Date();
+    await invoice.save();
 
-            invoice.amountPaid = +(invoice.amountPaid + amount).toFixed(2);
-            invoice.lastPaymentDate = new Date();
-            await invoice.save({ session });
-        });
+    await updateCustomerBalance(cn.customerId);
 
-        await updateCustomerBalance(cn.customerId);
-
-        res.json({ success: true, message: 'Credit applied to invoice', data: cn });
-    } finally {
-        session.endSession();
-    }
+    res.json({ success: true, message: 'Credit applied to invoice', data: cn });
 });

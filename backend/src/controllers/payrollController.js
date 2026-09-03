@@ -481,7 +481,6 @@ export const downloadPayrollSheet = asyncHandler(async (req, res) => {
     }
 
     const doc = new PdfPrinter({
-        bufferPages: true,
         margin: 30,
         size: 'A4',
         layout: 'landscape'
@@ -570,15 +569,12 @@ export const downloadPayrollSheet = asyncHandler(async (req, res) => {
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
         doc.switchToPage(i);
-        const oldBottomMargin = doc.page.margins.bottom;
-        doc.page.margins.bottom = 0;
         doc.fontSize(7).fillColor('#94A3B8').text(
             `Page ${i + 1} of ${range.count}  ·  Generated automatically by GLX ERP`,
             0,
             doc.page.height - 20,
-            { align: 'center', width: doc.page.width, lineBreak: false }
+            { align: 'center', width: doc.page.width }
         );
-        doc.page.margins.bottom = oldBottomMargin;
     }
 
     doc.end();
@@ -822,15 +818,8 @@ export const getPublicPayslipByToken = asyncHandler(async (req, res) => {
     const { token } = req.params;
     const payroll = await Payroll.findOne(
         { 'payslips.payslipShareToken': token, deletedAt: null },
-        { 'payslips.$': 1, periodMonth: 1, periodYear: 1, payrollNumber: 1, periodStartDate: 1, periodEndDate: 1, createdAt: 1 }
-    ).populate({
-        path: 'payslips.employeeId',
-        select: 'firstName lastName employeeCode departmentId designationId phone secondaryPhone email bankDetails gsCertificate policeReport educationCertificates paymentType labourRate epfNumber',
-        populate: [
-            { path: 'departmentId', select: 'name code' },
-            { path: 'designationId', select: 'name code' }
-        ]
-    });
+        { 'payslips.$': 1, periodMonth: 1, periodYear: 1, payrollNumber: 1, createdAt: 1 }
+    ).populate('payslips.employeeId', 'firstName lastName employeeCode departmentId designationId phone secondaryPhone email bankDetails gsCertificate policeReport educationCertificates paymentType labourRate');
 
     if (!payroll || !payroll.payslips || payroll.payslips.length === 0) {
         res.status(404);
@@ -838,28 +827,13 @@ export const getPublicPayslipByToken = asyncHandler(async (req, res) => {
     }
 
     const payslip = payroll.payslips[0];
-    const emp = payslip.employeeId;
-
     res.json({
         success: true,
         data: {
+            payrollNumber: payroll.payrollNumber,
+            periodMonth: payroll.periodMonth,
+            periodYear: payroll.periodYear,
             payslip,
-            payroll: {
-                payrollNumber: payroll.payrollNumber,
-                periodMonth: payroll.periodMonth,
-                periodYear: payroll.periodYear,
-                periodStartDate: payroll.periodStartDate,
-                periodEndDate: payroll.periodEndDate,
-            },
-            employee: {
-                firstName: emp?.firstName,
-                lastName: emp?.lastName,
-                employeeCode: emp?.employeeCode,
-                department: emp?.departmentId?.name || emp?.department,
-                designation: emp?.designationId?.name || emp?.designation,
-                epfNumber: emp?.epfNumber,
-                bankDetails: emp?.bankDetails,
-            },
         }
     });
 });

@@ -49,3 +49,7 @@ export const hrReportsApi = {
     payrollSummary: async (params = {}) => (await api.get('/reports/hr/payroll-summary', { params })).data,
     shiftWise: async (params = {}) => (await api.get('/reports/hr/shift-wise', { params })).data,
 };
+
+export const predictionsApi = {
+    dashboard: async () => (await api.get('/reports/predictions/dashboard')).data,
+};

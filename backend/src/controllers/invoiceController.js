@@ -47,7 +47,7 @@ const deductStockForInvoice = async (invoice, userId) => {
 /**
  * Helper: recalculate customer credit balance
  */
-const updateCustomerBalance = async (customerId, session) => {
+const updateCustomerBalance = async (customerId) => {
     const result = await Invoice.aggregate([
         {
             $match: {
@@ -67,11 +67,11 @@ const updateCustomerBalance = async (customerId, session) => {
                 },
             },
         },
-    ]).session(session || null);
+    ]);
 
     const summary = result[0] || { totalBalance: 0, overdueAmount: 0 };
 
-    const customer = await Customer.findById(customerId).session(session || null);
+    const customer = await Customer.findById(customerId);
     if (customer) {
         const currentBalance = +summary.totalBalance.toFixed(2);
         const overdueAmount = +summary.overdueAmount.toFixed(2);
@@ -90,8 +90,7 @@ const updateCustomerBalance = async (customerId, session) => {
                     'creditStatus.isOverdue': isOverdue,
                     'creditStatus.availableCredit': availableCredit,
                 }
-            },
-            { session: session || undefined }
+            }
         );
     }
 };

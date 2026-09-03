@@ -160,8 +160,8 @@ export default function InvoiceFormPage() {
                         <div className="space-y-4">
                             <Select label="Customer" required placeholder="Select customer..."
                                 options={customerOptions} value={customerId} onChange={(e) => {
-                                    setCustomerId(custId);
-                                    const cust = (customersData?.data || []).find((c) => c._id === custId);
+                                    setCustomerId(e.target.value);
+                                    const cust = (customersData?.data || []).find((c) => c._id === e.target.value);
                                     if (cust && cust.introducer) {
                                         setIntroducer(cust.introducer);
                                         setIntroducerName(cust.introducerName || '');
@@ -254,29 +254,7 @@ export default function InvoiceFormPage() {
                                 )}
                             </div>
 
-                            <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 space-y-2">
-                                <label className="block text-xs font-bold text-gray-700 uppercase">Lorry Body Photo</label>
-                                <input 
-                                    type="file" 
-                                    accept="image/*"
-                                    className="text-xs text-gray-500 w-full file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
-                                    onChange={(e) => {
-                                        const file = e.target.files[0];
-                                        if (file) {
-                                            const r = new FileReader();
-                                            r.onloadend = () => setLorryBodyImage(r.result);
-                                            r.readAsDataURL(file);
-                                        }
-                                    }}
-                                />
-                                {numberPlateImage && (
-                                    <div className="relative border rounded p-1 bg-white">
-                                        <img src={numberPlateImage} alt="Plate Preview" className="h-24 object-contain mx-auto" />
-                                        <button type="button" onClick={() => setNumberPlateImage('')} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5"><X size={12} /></button>
-                                    </div>
-                                )}
-                            </div>
-
+                            {/* Lorry Body Photo */}
                             <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 space-y-2">
                                 <label className="block text-xs font-bold text-gray-700 uppercase">Lorry Body Photo</label>
                                 <input 

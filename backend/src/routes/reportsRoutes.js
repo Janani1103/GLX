@@ -116,7 +116,7 @@ router.get('/production/cogs', requirePermission('reports.financial'), async (re
         const cashFilter = { deletedAt: null, transactionType: 'expense' };
         if (startDate || endDate) cashFilter.date = matchDate;
 
-        const cashSummary = await PettyCash.aggregate([
+        const [cashSummary] = await PettyCash.aggregate([
             { $match: cashFilter },
             {
                 $group: {

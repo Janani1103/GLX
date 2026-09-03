@@ -1,23 +1,10 @@
 [
   {
-    "_id": "6a9265f1141efd7ecf342cbc",
+    "_id": "6a990b58c5ae43d15fe471e0",
     "customerType": "company",
     "businessType": "retailer",
-    "companyName": "Abans Logistics Pvt Ltd",
-    "displayName": "Abans Logistics",
+    "displayName": "Hemal Ranasinghe",
     "tags": [],
-    "primaryContact": {
-      "name": "Dhammika Perera",
-      "email": "dhammika@abans.lk",
-      "phone": "+94 77 333 4444"
-    },
-    "billingAddress": {
-      "line1": "498 Galle Road",
-      "city": "Colombo 03",
-      "country": "Sri Lanka",
-      "isDefault": false,
-      "_id": "6a9265f1141efd7ecf342cbd"
-    },
     "paymentTerms": {
       "type": "cod",
       "creditDays": 0,
@@ -38,41 +25,51 @@
       "totalPaidAmount": 0
     },
     "status": "active",
-    "createdBy": "6a9265ab7daa2e51c5e5d170",
+    "createdBy": "6a9904d35a35c50b977aeb4c",
     "deletedAt": null,
     "contacts": [],
     "shippingAddresses": [],
-    "createdAt": "2026-08-29T04:54:09.867Z",
-    "updatedAt": "2026-08-29T04:54:09.867Z",
+    "createdAt": "2026-09-03T05:53:28.278Z",
+    "updatedAt": "2026-09-03T05:53:28.278Z",
     "customerCode": "CUST-1",
     "__v": 0,
-    "phone": "+94 77 333 4444"
+    "phone": "—"
   },
   {
-    "_id": "6a9265f2141efd7ecf342cbe",
-    "customerType": "company",
-    "businessType": "retailer",
-    "companyName": "Keells Super Distribution",
-    "displayName": "Keells Distribution",
+    "_id": "6a990da4c5ae43d15fe47220",
+    "customerType": "individual",
+    "businessType": "other",
+    "displayName": "ASP",
+    "firstName": "Janani",
+    "lastName": "Nethma",
     "tags": [],
     "primaryContact": {
-      "name": "Niroshan Dickwella",
-      "email": "niroshan@keells.com",
-      "phone": "+94 71 888 9999"
+      "name": "",
+      "email": "",
+      "phone": "",
+      "mobile": ""
     },
+    "contacts": [],
     "billingAddress": {
-      "line1": "130 Glennie Street",
-      "city": "Colombo 02",
+      "label": "",
+      "line1": "",
+      "line2": "",
+      "city": "",
+      "state": "",
       "country": "Sri Lanka",
-      "isDefault": false,
-      "_id": "6a9265f2141efd7ecf342cbf"
+      "postalCode": "",
+      "phone": "",
+      "deliveryInstructions": "",
+      "isDefault": true,
+      "_id": "6a990da4c5ae43d15fe47221"
     },
+    "shippingAddresses": [],
     "paymentTerms": {
-      "type": "cod",
+      "type": "advance",
       "creditDays": 0,
       "creditLimit": 0
     },
-    "defaultDiscountPercent": 0,
+    "defaultDiscountPercent": 20,
     "creditStatus": {
       "currentBalance": 0,
       "overdueAmount": 0,
@@ -87,21 +84,20 @@
       "totalPaidAmount": 0
     },
     "status": "active",
-    "createdBy": "6a9265ab7daa2e51c5e5d170",
+    "createdBy": "6a9904d35a35c50b977aeb4c",
     "deletedAt": null,
-    "contacts": [],
-    "shippingAddresses": [],
-    "createdAt": "2026-08-29T04:54:10.276Z",
-    "updatedAt": "2026-08-29T04:54:10.276Z",
+    "createdAt": "2026-09-03T06:03:16.522Z",
+    "updatedAt": "2026-09-03T06:32:22.641Z",
     "customerCode": "CUST-2",
     "__v": 0,
-    "phone": "+94 71 888 9999"
+    "phone": "—"
   },
   {
-    "_id": "6a9902e7cc00fa7d165b86f2",
+    "_id": "6a990e31c5ae43d15fe47223",
     "customerType": "company",
     "businessType": "retailer",
-    "displayName": "Singer",
+    "companyName": "Mr. UPDK Dhanasekara",
+    "displayName": "Mr. UPDK Dhanasekara",
     "tags": [],
     "paymentTerms": {
       "type": "cod",
@@ -123,13 +119,108 @@
       "totalPaidAmount": 0
     },
     "status": "active",
-    "createdBy": "6a926039dd8496f34807679f",
+    "createdBy": "6a9904d35a35c50b977aeb4c",
     "deletedAt": null,
     "contacts": [],
     "shippingAddresses": [],
-    "createdAt": "2026-09-03T05:17:27.512Z",
-    "updatedAt": "2026-09-03T05:17:27.512Z",
+    "createdAt": "2026-09-03T06:05:37.374Z",
+    "updatedAt": "2026-09-03T06:05:37.374Z",
     "customerCode": "CUST-3",
+    "__v": 0,
+    "phone": "—"
+  },
+  {
+    "_id": "6a990e67c5ae43d15fe47228",
+    "customerType": "company",
+    "businessType": "retailer",
+    "companyName": "Janani Nethma",
+    "displayName": "Janani Nethma",
+    "tags": [],
+    "primaryContact": {
+      "phone": "0721540670"
+    },
+    "paymentTerms": {
+      "type": "cod",
+      "creditDays": 0,
+      "creditLimit": 0
+    },
+    "defaultDiscountPercent": 0,
+    "creditStatus": {
+      "currentBalance": 0,
+      "overdueAmount": 0,
+      "availableCredit": 0,
+      "isOverdue": false,
+      "daysPastDue": 0,
+      "onCreditHold": false
+    },
+    "analytics": {
+      "totalOrders": 0,
+      "totalOrderValue": 0,
+      "totalPaidAmount": 0
+    },
+    "status": "active",
+    "createdBy": "6a9904d35a35c50b977aeb4c",
+    "deletedAt": null,
+    "contacts": [],
+    "shippingAddresses": [],
+    "createdAt": "2026-09-03T06:06:31.362Z",
+    "updatedAt": "2026-09-03T06:21:09.465Z",
+    "customerCode": "CUST-4",
+    "__v": 0,
+    "phone": "0721540670"
+  },
+  {
+    "_id": "6a9918b8ad64d4da5d9034d4",
+    "customerType": "company",
+    "businessType": "retailer",
+    "displayName": "se",
+    "tags": [],
+    "primaryContact": {
+      "name": "",
+      "email": "",
+      "phone": "",
+      "mobile": ""
+    },
+    "contacts": [],
+    "billingAddress": {
+      "label": "",
+      "line1": "",
+      "line2": "",
+      "city": "",
+      "state": "",
+      "country": "Sri Lanka",
+      "postalCode": "",
+      "phone": "",
+      "deliveryInstructions": "",
+      "isDefault": true,
+      "_id": "6a9918b8ad64d4da5d9034d5"
+    },
+    "shippingAddresses": [],
+    "paymentTerms": {
+      "type": "cod",
+      "creditDays": 0,
+      "creditLimit": 0
+    },
+    "defaultDiscountPercent": 0,
+    "creditStatus": {
+      "currentBalance": 0,
+      "overdueAmount": 0,
+      "availableCredit": 0,
+      "isOverdue": false,
+      "daysPastDue": 0,
+      "onCreditHold": false
+    },
+    "analytics": {
+      "totalOrders": 0,
+      "totalOrderValue": 0,
+      "totalPaidAmount": 0
+    },
+    "status": "active",
+    "createdBy": "6a9904d35a35c50b977aeb4c",
+    "deletedAt": null,
+    "createdAt": "2026-09-03T06:50:32.306Z",
+    "updatedAt": "2026-09-03T06:50:32.306Z",
+    "customerCode": "CUST-5",
     "__v": 0,
     "phone": "—"
   }

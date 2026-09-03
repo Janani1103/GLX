@@ -53,7 +53,7 @@ router.route('/employees/:id')
 
 // ── Shifts ─────────────────────────────────────────────────────────────────────
 router.route('/shifts')
-    .get(requireAnyPermission('hr.shifts.manage', 'hr.employees.view', 'hr.attendance.view'), getShifts)
+    .get(requirePermission('hr.shifts.manage'), getShifts)
     .post(requirePermission('hr.shifts.manage'), createShift);
 
 router.route('/shifts/:id')
@@ -147,7 +147,7 @@ router.get('/employee-of-month', requirePermission('hr.employees.view'), async (
                 }
             },
             { $sort: { daysPresent: -1, totalOTMins: -1 } },
-            { $limit: 20 },
+            { $limit: 3 },
             {
                 $lookup: {
                     from:         'employees',

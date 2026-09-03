@@ -52,10 +52,7 @@ export default function SalesOrderFormPage() {
     const { data: warehousesData } = useWarehouses({ isActive: true });
 
     const customers = customersData?.data || [];
-    const NON_SELLABLE_TYPES = ['raw_material', 'packaging', 'consumable', 'service'];
-    const products = (productsData?.data || []).filter(
-        (p) => p.canBeSold !== false && !NON_SELLABLE_TYPES.includes(p.productType)
-    );
+    const products = (productsData?.data || []);
     const warehouses = warehousesData?.data || [];
 
     // Set default warehouse on load
@@ -106,24 +103,22 @@ export default function SalesOrderFormPage() {
     }));
 
     // Product options with live stock from selected warehouse
-    const productOptions = products
-        .filter((p) => p.canBeSold !== false)
-        .map((p) => {
-            const stock = stockMap.get(p._id);
-            const available = stock?.available || 0;
-            const outOfStock = available <= 0;
-            const lowStock = available > 0 && available <= (p.stockLevels?.reorderLevel || 0);
-            return {
-                value: p._id,
-                label: `${p.name} · ${p.productCode} · ${outOfStock
-                    ? '⚠ Out of stock'
-                    : lowStock
-                        ? `⚠ Only ${available} left`
-                        : `✓ ${available} available`
-                    } · LKR ${p.basePrice || p.costs?.lastPurchaseCost || p.costs?.averageCost || 0}`,
-                disabled: outOfStock,
-            };
-        });
+    const productOptions = products.map((p) => {
+        const stock = stockMap.get(p._id);
+        const available = stock?.available || 0;
+        const outOfStock = available <= 0;
+        const lowStock = available > 0 && available <= (p.stockLevels?.reorderLevel || 0);
+        return {
+            value: p._id,
+            label: `${p.name} · ${p.productCode} · ${outOfStock
+                ? '⚠ Out of stock'
+                : lowStock
+                    ? `⚠ Only ${available} left`
+                    : `✓ ${available} available`
+                } · LKR ${p.basePrice || p.costs?.lastPurchaseCost || p.costs?.averageCost || 0}`,
+            disabled: false,
+        };
+    });
 
     const shippingAddressOptions = selectedCustomer?.shippingAddresses?.map((a) => ({
         value: a.label || `${a.city || ''}`,

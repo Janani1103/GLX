@@ -66,9 +66,11 @@ import ReturnDetailPage from './pages/ReturnDetailPage';
 import CreditNotesPage from './pages/CreditNotesPage';
 import CreditNoteDetailPage from './pages/CreditNoteDetailPage';
 import DamagesPage from './pages/DamagesPage';
+import DamageDetailPage from './pages/DamageDetailPage';
 import SupplierReturnsPage from './pages/SupplierReturnsPage';
 import SupplierReturnDetailPage from './pages/SupplierReturnDetailPage';
 import RepairsPage from './pages/RepairsPage';
+import RepairFormPage from './pages/RepairFormPage';
 import RepairDetailPage from './pages/RepairDetailPage';
 import DailyPnLPage from './pages/DailyPnLPage';
 import PosPage from './pages/PosPage';
@@ -211,11 +213,13 @@ function App() {
         <Route path="/credit-notes" element={<ProtectedRoute requiredPermission="credit_notes.view"><CreditNotesPage /></ProtectedRoute>} />
         <Route path="/credit-notes/:id" element={<ProtectedRoute requiredPermission="credit_notes.view"><CreditNoteDetailPage /></ProtectedRoute>} />
         <Route path="/damages" element={<ProtectedRoute requiredPermission="damages.view"><DamagesPage /></ProtectedRoute>} />
+        <Route path="/damages/:id" element={<ProtectedRoute requiredPermission="damages.view"><DamageDetailPage /></ProtectedRoute>} />
         <Route path="/pos" element={<ProtectedRoute requiredPermission="pos.access"><PosPage /></ProtectedRoute>} />
 
         <Route path="/supplier-returns" element={<ProtectedRoute requiredPermission="supplier_returns.view"><SupplierReturnsPage /></ProtectedRoute>} />
         <Route path="/supplier-returns/:id" element={<ProtectedRoute requiredPermission="supplier_returns.view"><SupplierReturnDetailPage /></ProtectedRoute>} />
         <Route path="/repairs" element={<ProtectedRoute requiredPermission="repairs.view"><RepairsPage /></ProtectedRoute>} />
+        <Route path="/repairs/new" element={<ProtectedRoute requiredPermission="repairs.manage"><RepairFormPage /></ProtectedRoute>} />
         <Route path="/repairs/:id" element={<ProtectedRoute requiredPermission="repairs.view"><RepairDetailPage /></ProtectedRoute>} />
 
         {/* HR Module */}
@@ -259,7 +263,7 @@ function App() {
         <Route path="/reports/variance-comparator" element={<ProtectedRoute requiredPermission="reports.financial"><VarianceComparisonPage /></ProtectedRoute>} />
         <Route path="/reports/hr" element={<ProtectedRoute requiredPermission="reports.hr"><HrReportsPage /></ProtectedRoute>} />
         <Route path="/reports/shift-wise" element={<ProtectedRoute requiredPermission="reports.hr"><ShiftReportingPage /></ProtectedRoute>} />
-        <Route path="/reports/predictions" element={<ProtectedRoute requiredAnyPermission={['reports.sales', 'reports.financial', 'reports.inventory', 'reports.production']}><FuturePredictionsPage /></ProtectedRoute>} />
+        <Route path="/reports/predictions" element={<ProtectedRoute requiredPermission="reports.sales"><FuturePredictionsPage /></ProtectedRoute>} />
 
         {/* Admin only */}
         <Route path="/users" element={<ProtectedRoute requiredPermission="admin.users.view"><UsersPage /></ProtectedRoute>} />

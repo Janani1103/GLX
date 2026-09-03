@@ -1,248 +1,34 @@
 [
   {
-    "_id": "6a9265de001aa43798c83b96",
-    "productCode": "GLX-BODY-145",
-    "name": "Heavy Duty Lorry Body 14.5ft",
-    "productType": "finished_good",
-    "canBeManufactured": false,
-    "canBePurchased": true,
-    "canBeSold": true,
-    "tags": [],
-    "type": "trading",
-    "unitOfMeasure": "pcs",
-    "basePrice": 1250000,
-    "minPrice": 0,
-    "currency": "LKR",
-    "tax": {
-      "taxable": true,
-      "taxRate": 18
-    },
-    "costs": {
-      "lastPurchaseCost": 0,
-      "averageCost": 0,
-      "standardCost": 0
-    },
-    "stockLevels": {
-      "minimumLevel": 0,
-      "reorderLevel": 0,
-      "maximumLevel": 0
-    },
-    "salesConfig": {
-      "sellable": true,
-      "minimumOrderQuantity": 1,
-      "allowBackorder": false
-    },
-    "status": "inactive",
-    "createdBy": "6a9265ab7daa2e51c5e5d170",
-    "deletedAt": null,
-    "tierPricing": [],
-    "createdAt": "2026-08-29T04:53:50.217Z",
-    "updatedAt": "2026-08-29T04:53:50.217Z",
-    "__v": 0,
-    "categoryName": "—",
-    "brandName": "—"
-  },
-  {
-    "_id": "6a9265de001aa43798c83b98",
-    "productCode": "GLX-FREEZER-10",
-    "name": "Insulated Freezer Box 10ft",
-    "productType": "finished_good",
-    "canBeManufactured": false,
-    "canBePurchased": true,
-    "canBeSold": true,
-    "tags": [],
-    "type": "trading",
-    "unitOfMeasure": "pcs",
-    "basePrice": 1850000,
-    "minPrice": 0,
-    "currency": "LKR",
-    "tax": {
-      "taxable": true,
-      "taxRate": 18
-    },
-    "costs": {
-      "lastPurchaseCost": 0,
-      "averageCost": 0,
-      "standardCost": 0
-    },
-    "stockLevels": {
-      "minimumLevel": 0,
-      "reorderLevel": 0,
-      "maximumLevel": 0
-    },
-    "salesConfig": {
-      "sellable": true,
-      "minimumOrderQuantity": 1,
-      "allowBackorder": false
-    },
-    "status": "inactive",
-    "createdBy": "6a9265ab7daa2e51c5e5d170",
-    "deletedAt": null,
-    "tierPricing": [],
-    "createdAt": "2026-08-29T04:53:50.818Z",
-    "updatedAt": "2026-08-29T04:53:50.818Z",
-    "__v": 0,
-    "categoryName": "—",
-    "brandName": "—"
-  },
-  {
-    "_id": "6a9265f0141efd7ecf342cb6",
-    "productCode": "RAW-ALU-SHEET",
-    "name": "Aluminium Sheet 2mm (8x4)",
+    "_id": "6a9905e2c5ae43d15fe47192",
+    "productCode": "P-ALU-MSC-26246-01",
+    "sku": "SKU-1024",
+    "barcode": "8901234567012",
+    "name": "MS Channel 3'' x 20ft",
     "productType": "raw_material",
-    "canBeManufactured": false,
-    "canBePurchased": true,
-    "canBeSold": true,
-    "tags": [],
-    "type": "trading",
-    "unitOfMeasure": "pcs",
-    "basePrice": 28000,
-    "minPrice": 0,
-    "currency": "LKR",
-    "tax": {
-      "taxable": true,
-      "taxRate": 18
-    },
-    "costs": {
-      "lastPurchaseCost": 0,
-      "averageCost": 0,
-      "standardCost": 0
-    },
-    "stockLevels": {
-      "minimumLevel": 0,
-      "reorderLevel": 0,
-      "maximumLevel": 0
-    },
-    "salesConfig": {
-      "sellable": true,
-      "minimumOrderQuantity": 1,
-      "allowBackorder": false
-    },
-    "status": "inactive",
-    "createdBy": "6a9265ab7daa2e51c5e5d170",
-    "deletedAt": null,
-    "tierPricing": [],
-    "createdAt": "2026-08-29T04:54:08.395Z",
-    "updatedAt": "2026-08-29T04:54:08.395Z",
-    "__v": 0,
-    "categoryName": "—",
-    "brandName": "—"
-  },
-  {
-    "_id": "6a9265f0141efd7ecf342cb8",
-    "productCode": "RAW-STEEL-TUBE",
-    "name": "Steel Square Tube 2x2 Inch",
-    "productType": "raw_material",
-    "canBeManufactured": false,
-    "canBePurchased": true,
-    "canBeSold": true,
-    "tags": [],
-    "type": "trading",
-    "unitOfMeasure": "pcs",
-    "basePrice": 14500,
-    "minPrice": 0,
-    "currency": "LKR",
-    "tax": {
-      "taxable": true,
-      "taxRate": 18
-    },
-    "costs": {
-      "lastPurchaseCost": 0,
-      "averageCost": 0,
-      "standardCost": 0
-    },
-    "stockLevels": {
-      "minimumLevel": 0,
-      "reorderLevel": 0,
-      "maximumLevel": 0
-    },
-    "salesConfig": {
-      "sellable": true,
-      "minimumOrderQuantity": 1,
-      "allowBackorder": false
-    },
-    "status": "inactive",
-    "createdBy": "6a9265ab7daa2e51c5e5d170",
-    "deletedAt": null,
-    "tierPricing": [],
-    "createdAt": "2026-08-29T04:54:08.743Z",
-    "updatedAt": "2026-08-29T04:54:08.743Z",
-    "__v": 0,
-    "categoryName": "—",
-    "brandName": "—"
-  },
-  {
-    "_id": "6a9265f1141efd7ecf342cba",
-    "productCode": "ACC-TAILGATE-15",
-    "name": "Hydraulic Tailgate Lift 1.5T",
-    "productType": "finished_good",
-    "canBeManufactured": false,
-    "canBePurchased": true,
-    "canBeSold": true,
-    "tags": [],
-    "type": "trading",
-    "unitOfMeasure": "pcs",
-    "basePrice": 650000,
-    "minPrice": 0,
-    "currency": "LKR",
-    "tax": {
-      "taxable": true,
-      "taxRate": 18
-    },
-    "costs": {
-      "lastPurchaseCost": 0,
-      "averageCost": 0,
-      "standardCost": 0
-    },
-    "stockLevels": {
-      "minimumLevel": 0,
-      "reorderLevel": 0,
-      "maximumLevel": 0
-    },
-    "salesConfig": {
-      "sellable": true,
-      "minimumOrderQuantity": 1,
-      "allowBackorder": false
-    },
-    "status": "inactive",
-    "createdBy": "6a9265ab7daa2e51c5e5d170",
-    "deletedAt": null,
-    "tierPricing": [],
-    "createdAt": "2026-08-29T04:54:09.103Z",
-    "updatedAt": "2026-08-29T04:54:09.103Z",
-    "__v": 0,
-    "categoryName": "—",
-    "brandName": "—"
-  },
-  {
-    "_id": "6a9903a4b5c5da6e69253cbf",
-    "sku": "111",
-    "barcode": "BC567646569672",
-    "name": "product 1",
-    "productType": "finished_good",
     "canBeManufactured": true,
     "canBePurchased": true,
     "canBeSold": true,
-    "shortName": "product 1",
+    "shortName": "MS Channel 3'' x 20ft",
     "categoryId": {
-      "_id": "6a9265ae7daa2e51c5e5d17a",
-      "name": "Hardware & Fasteners"
+      "_id": "6a9900f2c5ae43d15fe47170",
+      "name": "Aluminium Profiles"
     },
     "tags": [],
-    "type": "manufactured",
-    "unitOfMeasure": "pc",
-    "basePrice": 120000,
+    "type": "trading",
+    "unitOfMeasure": "m",
+    "basePrice": 15800,
     "minPrice": 0,
-    "mrp": 120000,
+    "mrp": 15800,
     "currency": "LKR",
     "tax": {
       "taxable": true,
       "taxRate": 18
     },
     "costs": {
-      "lastPurchaseCost": 100000,
-      "averageCost": 100000,
-      "standardCost": 100000
+      "lastPurchaseCost": 12500,
+      "averageCost": 12500,
+      "standardCost": 12500
     },
     "stockLevels": {
       "minimumLevel": 0,
@@ -259,15 +45,128 @@
       "allowBackorder": false
     },
     "status": "active",
-    "createdBy": "6a926039dd8496f34807679f",
+    "createdBy": "6a9904d35a35c50b977aeb4c",
     "deletedAt": null,
     "tierPricing": [],
-    "createdAt": "2026-09-03T05:20:36.285Z",
-    "updatedAt": "2026-09-03T05:27:56.634Z",
-    "productCode": "P-HAR-PRD-26246-01",
+    "createdAt": "2026-09-03T05:30:10.321Z",
+    "updatedAt": "2026-09-03T06:12:19.730Z",
     "__v": 0,
-    "updatedBy": "6a926039dd8496f34807679f",
-    "categoryName": "Hardware & Fasteners",
+    "brandId": {
+      "_id": "6a9906e1c5ae43d15fe47195",
+      "name": "Ceylon Steel Industries"
+    },
+    "updatedBy": "6a9904d35a35c50b977aeb4c",
+    "categoryName": "Aluminium Profiles",
+    "brandName": "Ceylon Steel Industries"
+  },
+  {
+    "_id": "6a991455f169e5b6a5fc9b54",
+    "productCode": "P-ACC-LCB-26246-01",
+    "name": "Statutory Tax Ledger",
+    "productType": "finished_good",
+    "canBeManufactured": true,
+    "canBePurchased": true,
+    "canBeSold": true,
+    "shortName": "Statutory Tax Ledger",
+    "categoryId": {
+      "_id": "6a9900f2c5ae43d15fe47172",
+      "name": "Accessories & Hardware"
+    },
+    "brandId": {
+      "_id": "6a9906e1c5ae43d15fe47195",
+      "name": "Ceylon Steel Industries"
+    },
+    "tags": [],
+    "type": "manufactured",
+    "unitOfMeasure": "pc",
+    "basePrice": 2450,
+    "minPrice": 0,
+    "mrp": 2450,
+    "currency": "LKR",
+    "tax": {
+      "taxable": true,
+      "taxRate": 18
+    },
+    "costs": {
+      "lastPurchaseCost": 1850,
+      "averageCost": 1850,
+      "standardCost": 1850
+    },
+    "stockLevels": {
+      "minimumLevel": 0,
+      "reorderLevel": 0,
+      "maximumLevel": 0
+    },
+    "packaging": {
+      "unitsPerCarton": 1,
+      "cartonsPerPallet": 1
+    },
+    "salesConfig": {
+      "sellable": true,
+      "minimumOrderQuantity": 1,
+      "allowBackorder": false
+    },
+    "status": "active",
+    "createdBy": "6a9904d35a35c50b977aeb4c",
+    "deletedAt": null,
+    "tierPricing": [],
+    "createdAt": "2026-09-03T06:31:49.255Z",
+    "updatedAt": "2026-09-03T06:31:49.255Z",
+    "__v": 0,
+    "categoryName": "Accessories & Hardware",
+    "brandName": "Ceylon Steel Industries"
+  },
+  {
+    "_id": "6a991bc5ad64d4da5d9034f9",
+    "productCode": "P-ALU-MSC-26246-02",
+    "name": "MS Checkered Plate - 8mm x 4ft x 8ft",
+    "productType": "raw_material",
+    "canBeManufactured": true,
+    "canBePurchased": true,
+    "canBeSold": true,
+    "shortName": "MS Checkered Plate - 8mm x 4ft x 8ft",
+    "categoryId": {
+      "_id": "6a9900f2c5ae43d15fe47170",
+      "name": "Aluminium Profiles"
+    },
+    "tags": [],
+    "type": "trading",
+    "unitOfMeasure": "pc",
+    "basePrice": 15800,
+    "minPrice": 0,
+    "mrp": 15800,
+    "currency": "LKR",
+    "tax": {
+      "taxable": true,
+      "taxRate": 18
+    },
+    "costs": {
+      "lastPurchaseCost": 12500,
+      "averageCost": 12500,
+      "standardCost": 12500
+    },
+    "stockLevels": {
+      "minimumLevel": 0,
+      "reorderLevel": 0,
+      "maximumLevel": 0
+    },
+    "packaging": {
+      "unitsPerCarton": 1,
+      "cartonsPerPallet": 1
+    },
+    "salesConfig": {
+      "sellable": true,
+      "minimumOrderQuantity": 1,
+      "allowBackorder": false
+    },
+    "status": "active",
+    "createdBy": "6a9904d35a35c50b977aeb4c",
+    "deletedAt": null,
+    "tierPricing": [],
+    "createdAt": "2026-09-03T07:03:33.046Z",
+    "updatedAt": "2026-09-03T07:03:33.046Z",
+    "__v": 0,
+    "categoryName": "Aluminium Profiles",
     "brandName": "—"
   }
 ]

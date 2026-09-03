@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Search, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Search, AlertTriangle, Eye, Edit, Trash2 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -13,13 +14,15 @@ import Modal from '../components/ui/Modal';
 import Textarea from '../components/ui/Textarea';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { useDamages, useCreateDamage, useDamageSummary } from '../features/returns/useReturns';
+import { useDamages, useCreateDamage, useUpdateDamage, useDeleteDamage, useDamageSummary } from '../features/returns/useReturns';
 import { productsApi } from '../features/products/productsApi';
 import { useWarehouses } from '../features/warehouses/useWarehouses';
 
 export default function DamagesPage() {
+    const navigate = useNavigate();
     const [filters, setFilters] = useState({ source: '', page: 1, limit: 15 });
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [editingId, setEditingId] = useState(null);
 
     const [productId, setProductId] = useState('');
     const [quantity, setQuantity] = useState(0);
@@ -35,6 +38,8 @@ export default function DamagesPage() {
     const { data: productsData } = useQuery({ queryKey: ['products', 'all'], queryFn: () => productsApi.list({ limit: 500 }) });
     const { data: warehousesData } = useWarehouses({ isActive: true });
     const createMutation = useCreateDamage();
+    const updateMutation = useUpdateDamage();
+    const deleteMutation = useDeleteDamage();
 
     const damages = data?.data || [];
     const summary = summaryData?.data || { bySource: [], totalCount: 0, totalValue: 0 };
@@ -51,17 +56,77 @@ export default function DamagesPage() {
         { key: 'source', label: 'Source', render: (r) => <Badge>{r.source.replace(/_/g, ' ')}</Badge> },
         { key: 'disposition', label: 'Disposition', render: (r) => r.disposition.replace(/_/g, ' ') },
         { key: 'writtenOff', label: 'Written off', render: (r) => r.writtenOff ? <Badge variant="danger">Yes</Badge> : <Badge>No</Badge> },
+        {
+            key: 'actions',
+            label: 'Actions',
+            width: '120px',
+            render: (r) => (
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => navigate(`/damages/${r._id}`)}
+                        className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded"
+                        title="View"
+                    >
+                        <Eye size={16} />
+                    </button>
+                    <button
+                        onClick={() => handleEdit(r)}
+                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                        title="Edit"
+                    >
+                        <Edit size={16} />
+                    </button>
+                    <button
+                        onClick={() => handleDelete(r._id)}
+                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                        title="Delete"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                </div>
+            )
+        },
     ];
 
     const submit = async () => {
         if (!productId || !quantity || !warehouseId) { toast.error('Required fields missing'); return; }
         try {
-            await createMutation.mutateAsync({
-                productId, quantity: +quantity, warehouseId, source, description,
-                disposition, costPerUnit: +costPerUnit, adjustStock,
-            });
+            if (editingId) {
+                await updateMutation.mutateAsync({
+                    productId, quantity: +quantity, warehouseId, source, description,
+                    disposition, costPerUnit: +costPerUnit,
+                });
+                toast.success('Damage updated');
+            } else {
+                await createMutation.mutateAsync({
+                    productId, quantity: +quantity, warehouseId, source, description,
+                    disposition, costPerUnit: +costPerUnit, adjustStock,
+                });
+                toast.success('Damage recorded');
+            }
             setIsFormOpen(false);
+            setEditingId(null);
             setProductId(''); setQuantity(0); setWarehouseId(''); setDescription('');
+        } catch { }
+    };
+
+    const handleEdit = (damage) => {
+        setEditingId(damage._id);
+        setProductId(damage.productId);
+        setQuantity(damage.quantity);
+        setWarehouseId(damage.warehouseId);
+        setSource(damage.source);
+        setDescription(damage.description || '');
+        setDisposition(damage.disposition);
+        setCostPerUnit(damage.costPerUnit || 0);
+        setAdjustStock(false);
+        setIsFormOpen(true);
+    };
+
+    const handleDelete = async (id) => {
+        if (!confirm('Are you sure you want to delete this damage record? This action cannot be undone.')) return;
+        try {
+            await deleteMutation.mutateAsync(id);
         } catch { }
     };
 
@@ -106,7 +171,7 @@ export default function DamagesPage() {
                                 onPageChange={(p) => setFilters((f) => ({ ...f, page: p }))} /></>}
             </Card>
 
-            <Modal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} title="Record Damage" size="md">
+            <Modal isOpen={isFormOpen} onClose={() => { setIsFormOpen(false); setEditingId(null); }} title={editingId ? 'Edit Damage' : 'Record Damage'} size="md">
                 <div className="p-6 space-y-4">
                     <Select label="Product" required placeholder="Select product..."
                         options={(productsData?.data || []).map((p) => ({ value: p._id, label: `${p.name} (${p.productCode})` }))}
@@ -146,8 +211,10 @@ export default function DamagesPage() {
                     </label>
                 </div>
                 <div className="flex justify-end gap-2 px-6 py-4 border-t bg-gray-50">
-                    <Button variant="outline" onClick={() => setIsFormOpen(false)}>Cancel</Button>
-                    <Button variant="primary" onClick={submit} loading={createMutation.isPending}>Record</Button>
+                    <Button variant="outline" onClick={() => { setIsFormOpen(false); setEditingId(null); }}>Cancel</Button>
+                    <Button variant="primary" onClick={submit} loading={createMutation.isPending || updateMutation.isPending}>
+                        {editingId ? 'Update' : 'Record'}
+                    </Button>
                 </div>
             </Modal>
         </div>

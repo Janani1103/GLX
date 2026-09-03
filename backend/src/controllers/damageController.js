@@ -19,70 +19,58 @@ export const createDamage = asyncHandler(async (req, res) => {
     const product = await Product.findById(productId);
     if (!product) { res.status(404); throw new Error('Product not found'); }
 
-    const session = await mongoose.startSession();
-    let damage;
+    const damage = new DamageRecord({
+        productId: product._id,
+        productCode: product.productCode,
+        productName: product.name,
+        quantity,
+        unitOfMeasure: product.unitOfMeasure,
+        costPerUnit: costPerUnit ?? (product.costs?.averageCost || product.costs?.lastPurchaseCost || 0),
+        warehouseId,
+        source: source || 'warehouse_damage',
+        description,
+        disposition: disposition || 'pending',
+        reportedBy: req.user._id,
+    });
+    await damage.save();
 
-    try {
-        await session.withTransaction(async () => {
-            damage = new DamageRecord({
-                productId: product._id,
-                productCode: product.productCode,
-                productName: product.name,
-                quantity,
-                unitOfMeasure: product.unitOfMeasure,
-                costPerUnit: costPerUnit ?? (product.costs?.averageCost || product.costs?.lastPurchaseCost || 0),
-                warehouseId,
-                source: source || 'warehouse_damage',
-                description,
-                disposition: disposition || 'pending',
-                reportedBy: req.user._id,
-            });
-            await damage.save({ session });
-
-            if (adjustStock) {
-                const result = await decreaseStock({
-                    productId: product._id,
-                    warehouseId,
-                    quantity,
-                    movementType: 'damage',
-                    sourceDocument: {
-                        type: 'damage_record',
-                        id: damage._id,
-                        number: damage.damageNumber,
-                    },
-                    reason: description || 'Damage recorded',
-                    userId: req.user._id,
-                    session,
-                });
-                damage.stockMovementId = result.movement._id;
-                damage.stockAdjusted = true;
-                await damage.save({ session });
-            }
-
-            // If disposition is 'repair', auto-create a RepairOrder
-            if (disposition === 'repair' || disposition === 'send_to_repair') {
-                const repair = new RepairOrder({
-                    productId: product._id,
-                    productCode: product.productCode,
-                    productName: product.name,
-                    quantity: quantity || 1,
-                    sourceType: 'damage_record',
-                    damageRecordId: damage._id,
-                    issueDescription: description || `Damaged item from ${damage.damageNumber} (${source || 'warehouse damage'})`,
-                    createdBy: req.user._id,
-                });
-                await repair.save({ session });
-                damage.repairOrderId = repair._id;
-                await damage.save({ session });
-            }
+    if (adjustStock) {
+        const result = await decreaseStock({
+            productId: product._id,
+            warehouseId,
+            quantity,
+            movementType: 'damage',
+            sourceDocument: {
+                type: 'damage_record',
+                id: damage._id,
+                number: damage.damageNumber,
+            },
+            reason: description || 'Damage recorded',
+            userId: req.user._id,
         });
-
-        res.status(201).json({ success: true, data: damage });
-    } catch (err) {
-        res.status(400); throw new Error(err.message);
-    } finally {
-        session.endSession();
+        damage.stockMovementId = result.movement._id;
+        damage.stockAdjusted = true;
+        await damage.save();
     }
+
+    // If disposition is 'repair', auto-create a RepairOrder
+    if (disposition === 'repair' || disposition === 'send_to_repair') {
+        const repair = new RepairOrder({
+            productId: product._id,
+            productCode: product.productCode,
+            productName: product.name,
+            quantity: quantity || 1,
+            sourceType: 'damage_record',
+            damageRecordId: damage._id,
+            issueDescription: description || `Damaged item from ${damage.damageNumber} (${source || 'warehouse damage'})`,
+            createdBy: req.user._id,
+        });
+        await repair.save();
+        damage.repairOrderId = repair._id;
+        await damage.save();
+    }
+
+    res.status(201).json({ success: true, data: damage });
 });
 
 export const getDamages = asyncHandler(async (req, res) => {

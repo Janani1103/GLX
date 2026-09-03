@@ -162,220 +162,216 @@ export const createSalesOrder = asyncHandler(async (req, res) => {
             chequeStatus,
         } = req.body;
 
-        const session = await mongoose.startSession();
         try {
-            await session.withTransaction(async () => {
-                let targetWarehouse = null;
-                if (order.sourceWarehouseId) {
-                    targetWarehouse = await Warehouse.findById(order.sourceWarehouseId).session(session);
-                } else if (warehouse?._id) {
-                    targetWarehouse = await Warehouse.findById(warehouse._id).session(session);
-                }
-                
-                if (!targetWarehouse) {
-                    targetWarehouse = await Warehouse.findOne({ isDefault: true, isActive: true }).session(session);
-                }
+            let targetWarehouse = null;
+            if (order.sourceWarehouseId) {
+                targetWarehouse = await Warehouse.findById(order.sourceWarehouseId);
+            } else if (warehouse?._id) {
+                targetWarehouse = await Warehouse.findById(warehouse._id);
+            }
+            
+            if (!targetWarehouse) {
+                targetWarehouse = await Warehouse.findOne({ isDefault: true, isActive: true });
+            }
 
-                if (!targetWarehouse) {
-                    throw new Error('Warehouse not found and no default warehouse exists.');
-                }
+            if (!targetWarehouse) {
+                throw new Error('Warehouse not found and no default warehouse exists.');
+            }
 
-                const warehouseId = targetWarehouse._id;
-                const allowNegative = targetWarehouse.settings?.allowNegativeStock || false;
+            const warehouseId = targetWarehouse._id;
+            const allowNegative = targetWarehouse.settings?.allowNegativeStock || false;
 
-                for (const item of order.items) {
-                    const stockItem = await StockItem.findOne({
-                        productId: item.productId,
-                        warehouseId,
-                        batchNumber: null,
-                    }).session(session);
-
-                    if (!allowNegative) {
-                        if (!stockItem) {
-                            throw new Error(
-                                `No stock record found for "${item.productName}" in the selected warehouse. Please enter opening stock first.`
-                            );
-                        }
-
-                        if (stockItem.quantities.openStock < item.orderedQuantity) {
-                            throw new Error(
-                                `Insufficient stock for "${item.productName}". Open stock: ${stockItem.quantities.openStock}, ordered: ${item.orderedQuantity}`
-                            );
-                        }
-                    }
-
-                    await decreaseStock({
-                        productId: item.productId,
-                        warehouseId,
-                        quantity: item.orderedQuantity,
-                        movementType: 'sale_dispatch',
-                        sourceDocument: {
-                            type: 'sales_order',
-                            id: order._id,
-                            number: order.orderNumber,
-                        },
-                        reason: 'POS sale checkout',
-                        userId: req.user._id,
-                        session,
-                        allowNegative,
-                    });
-
-                    item.dispatchedQuantity = item.orderedQuantity;
-                    item.deliveredQuantity = item.orderedQuantity;
-                    item.lineStatus = 'delivered';
-                }
-
-                order.status = 'invoiced';
-                order.approvedBy = req.user._id;
-                order.approvedAt = new Date();
-                order.isOnHold = false;
-                order.holdReason = null;
-                await order.save({ session });
-
-                const invoiceItems = order.items.map((orderItem) => ({
-                    productId: orderItem.productId,
-                    productCode: orderItem.productCode,
-                    productName: orderItem.productName,
-                    productTranslation: orderItem.productTranslation,
-                    description: orderItem.description,
-                    quantity: orderItem.orderedQuantity,
-                    unitOfMeasure: orderItem.unitOfMeasure,
-                    unitPrice: orderItem.unitPrice,
-                    discountPercent: orderItem.discountPercent,
-                    taxRate: orderItem.taxRate,
-                    taxable: orderItem.taxable,
-                    salesOrderLineId: orderItem._id,
-                }));
-
-                const isChequePending = paymentMethod === 'cheque' && chequeStatus !== 'cleared';
-                const payAmount = order.grandTotal;
-
-                const invoice = new Invoice({
-                    customerId: foundCustomer._id,
-                    customerSnapshot: {
-                        name: foundCustomer.displayName,
-                        code: foundCustomer.customerCode,
-                        taxRegistrationNumber: foundCustomer.taxRegistrationNumber,
-                        contactName: foundCustomer.primaryContact?.name,
-                    },
-                    billingAddress,
-                    shippingAddress,
-                    salesOrderIds: [order._id],
-                    salesOrderNumbers: [order.orderNumber],
-                    invoiceType: 'commercial',
-                    invoiceDate: new Date(),
-                    salesRepId: foundCustomer.assignedSalesRep || req.user._id,
-                    paymentTerms: {
-                        type: foundCustomer.paymentTerms?.type || 'cod',
-                        creditDays: foundCustomer.paymentTerms?.creditDays || 0,
-                    },
-                    items: invoiceItems,
-                    status: 'approved',
-                    paymentStatus: 'paid',
-                    amountPaid: payAmount,
-                    balanceDue: 0,
-                    stockDeducted: true,
-                    warehouseId: warehouseId,
-                    projectId: order.projectId,
-                    issuedToEmployeeId: order.issuedToEmployeeId,
-                    isGoToYard: order.isGoToYard,
-                    createdBy: req.user._id,
+            for (const item of order.items) {
+                const stockItem = await StockItem.findOne({
+                    productId: item.productId,
+                    warehouseId,
+                    batchNumber: null,
                 });
 
-                await invoice.save({ session });
+                if (!allowNegative) {
+                    if (!stockItem) {
+                        throw new Error(
+                            `No stock record found for "${item.productName}" in the selected warehouse. Please enter opening stock first.`
+                        );
+                    }
 
-                // Issue materials to project if Go to Yard is checked
-                if (order.isGoToYard && order.projectId) {
-                    const Project = mongoose.model('Project');
-                    const Expense = mongoose.model('Expense');
-                    const project = await Project.findById(order.projectId).session(session);
-                    if (project) {
-                        let totalBatchMaterialCost = 0;
-                        for (const item of order.items) {
-                            const prod = productMap.get(item.productId.toString());
-                            const buyingCost = prod?.costs?.averageCost 
-                                || prod?.costs?.lastPurchaseCost 
-                                || prod?.costs?.standardCost 
-                                || item.unitPrice 
-                                || prod?.basePrice 
-                                || 0;
-
-                            const lineMaterialTotal = (item.orderedQuantity || 1) * buyingCost;
-                            totalBatchMaterialCost += lineMaterialTotal;
-
-                            project.materialsIssued.push({
-                                product: item.productId,
-                                productCode: item.productCode,
-                                productName: item.productName,
-                                qty: item.orderedQuantity,
-                                buyingPrice: buyingCost,
-                                issuedBy: order.issuedToEmployeeId || req.user._id,
-                                issuedDate: new Date()
-                            });
-                        }
-
-                        // 1. Recalculate materialCost on project
-                        project.materialCost = project.materialsIssued.reduce((sum, m) => sum + ((m.qty || 0) * (m.buyingPrice || 0)), 0);
-                        await project.save({ session });
-
-                        // 2. Log an Expense entry so it appears under Expenses tab and financial expense reports
-                        const expense = new Expense({
-                            title: `POS Yard Materials: ${order.orderNumber}`,
-                            projectId: project._id,
-                            category: 'Raw Materials',
-                            amount: totalBatchMaterialCost,
-                            date: new Date(),
-                            paymentMethod: 'Cash',
-                            paymentStatus: 'Paid',
-                            notes: `POS Yard Checkout (${order.orderNumber}): ${order.items.map(i => `${i.productName} x${i.orderedQuantity}`).join(', ')}`,
-                            createdBy: req.user._id
-                        });
-                        await expense.save({ session });
-
-                        // 3. Recalculate project otherExpenses
-                        const allProjectExpenses = await Expense.find({ projectId: project._id, paymentStatus: 'Paid' }).session(session);
-                        project.otherExpenses = allProjectExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-                        await project.save({ session });
+                    if (stockItem.quantities.openStock < item.orderedQuantity) {
+                        throw new Error(
+                            `Insufficient stock for "${item.productName}". Open stock: ${stockItem.quantities.openStock}, ordered: ${item.orderedQuantity}`
+                        );
                     }
                 }
 
-                if (paymentMethod) {
-                    if (bankAccountId && paymentMethod !== 'cash' && !isChequePending) {
-                        const bankAccount = await BankAccount.findById(bankAccountId).session(session);
-                        if (!bankAccount) throw new Error('Company bank/cash account not found');
-                        bankAccount.balance = +(bankAccount.balance + payAmount).toFixed(2);
-                        await bankAccount.save({ session });
-                    }
+                await decreaseStock({
+                    productId: item.productId,
+                    warehouseId,
+                    quantity: item.orderedQuantity,
+                    movementType: 'sale_dispatch',
+                    sourceDocument: {
+                        type: 'sales_order',
+                        id: order._id,
+                        number: order.orderNumber,
+                    },
+                    reason: 'POS sale checkout',
+                    userId: req.user._id,
+                    allowNegative,
+                });
 
-                    const payment = new Payment({
-                        direction: 'received',
-                        customerId: foundCustomer._id,
-                        bankAccountId: paymentMethod !== 'cash' ? (bankAccountId || undefined) : undefined,
-                        amount: payAmount,
-                        method: paymentMethod,
-                        chequeNumber: paymentMethod === 'cheque' ? chequeNumber : undefined,
-                        chequeDate: paymentMethod === 'cheque' && chequeDate ? new Date(chequeDate) : undefined,
-                        chequeStatus: paymentMethod === 'cheque' ? (chequeStatus || 'pending') : undefined,
-                        bankName: paymentMethod === 'cheque' ? bankName : undefined,
-                        transactionReference: paymentMethod !== 'cheque' && paymentMethod !== 'cash' ? paymentReference : undefined,
-                        partyName: foundCustomer.displayName,
-                        allocations: [{
-                            documentType: 'invoice',
-                            documentId: invoice._id,
-                            documentNumber: invoice.invoiceNumber,
-                            amount: payAmount,
-                        }],
-                        receivedBy: req.user._id,
-                        createdBy: req.user._id,
-                    });
-                    await payment.save({ session });
-                }
+                item.dispatchedQuantity = item.orderedQuantity;
+                item.deliveredQuantity = item.orderedQuantity;
+                item.lineStatus = 'delivered';
+            }
 
-                await updateCustomerBalance(foundCustomer._id, session);
-                await excelService.updateExcelRow('sales_order', order);
+            order.status = 'invoiced';
+            order.approvedBy = req.user._id;
+            order.approvedAt = new Date();
+            order.isOnHold = false;
+            order.holdReason = null;
+            await order.save();
+
+            const invoiceItems = order.items.map((orderItem) => ({
+                productId: orderItem.productId,
+                productCode: orderItem.productCode,
+                productName: orderItem.productName,
+                productTranslation: orderItem.productTranslation,
+                description: orderItem.description,
+                quantity: orderItem.orderedQuantity,
+                unitOfMeasure: orderItem.unitOfMeasure,
+                unitPrice: orderItem.unitPrice,
+                discountPercent: orderItem.discountPercent,
+                taxRate: orderItem.taxRate,
+                taxable: orderItem.taxable,
+                salesOrderLineId: orderItem._id,
+            }));
+
+            const isChequePending = paymentMethod === 'cheque' && chequeStatus !== 'cleared';
+            const payAmount = order.grandTotal;
+
+            const invoice = new Invoice({
+                customerId: foundCustomer._id,
+                customerSnapshot: {
+                    name: foundCustomer.displayName,
+                    code: foundCustomer.customerCode,
+                    taxRegistrationNumber: foundCustomer.taxRegistrationNumber,
+                    contactName: foundCustomer.primaryContact?.name,
+                },
+                billingAddress,
+                shippingAddress,
+                salesOrderIds: [order._id],
+                salesOrderNumbers: [order.orderNumber],
+                invoiceType: 'commercial',
+                invoiceDate: new Date(),
+                salesRepId: foundCustomer.assignedSalesRep || req.user._id,
+                paymentTerms: {
+                    type: foundCustomer.paymentTerms?.type || 'cod',
+                    creditDays: foundCustomer.paymentTerms?.creditDays || 0,
+                },
+                items: invoiceItems,
+                status: 'approved',
+                paymentStatus: 'paid',
+                amountPaid: payAmount,
+                balanceDue: 0,
+                stockDeducted: true,
+                warehouseId: warehouseId,
+                projectId: order.projectId,
+                issuedToEmployeeId: order.issuedToEmployeeId,
+                isGoToYard: order.isGoToYard,
+                createdBy: req.user._id,
             });
 
-            // Recalculate project financials after transaction commits
+            await invoice.save();
+
+            // Issue materials to project if Go to Yard is checked
+            if (order.isGoToYard && order.projectId) {
+                const Project = mongoose.model('Project');
+                const Expense = mongoose.model('Expense');
+                const project = await Project.findById(order.projectId);
+                if (project) {
+                    let totalBatchMaterialCost = 0;
+                    for (const item of order.items) {
+                        const prod = productMap.get(item.productId.toString());
+                        const buyingCost = prod?.costs?.averageCost 
+                            || prod?.costs?.lastPurchaseCost 
+                            || prod?.costs?.standardCost 
+                            || item.unitPrice 
+                            || prod?.basePrice 
+                            || 0;
+
+                        const lineMaterialTotal = (item.orderedQuantity || 1) * buyingCost;
+                        totalBatchMaterialCost += lineMaterialTotal;
+
+                        project.materialsIssued.push({
+                            product: item.productId,
+                            productCode: item.productCode,
+                            productName: item.productName,
+                            qty: item.orderedQuantity,
+                            buyingPrice: buyingCost,
+                            issuedBy: order.issuedToEmployeeId || req.user._id,
+                            issuedDate: new Date()
+                        });
+                    }
+
+                    // 1. Recalculate materialCost on project
+                    project.materialCost = project.materialsIssued.reduce((sum, m) => sum + ((m.qty || 0) * (m.buyingPrice || 0)), 0);
+                    await project.save();
+
+                    // 2. Log an Expense entry so it appears under Expenses tab and financial expense reports
+                    const expense = new Expense({
+                        title: `POS Yard Materials: ${order.orderNumber}`,
+                        projectId: project._id,
+                        category: 'Raw Materials',
+                        amount: totalBatchMaterialCost,
+                        date: new Date(),
+                        paymentMethod: 'Cash',
+                        paymentStatus: 'Paid',
+                        notes: `POS Yard Checkout (${order.orderNumber}): ${order.items.map(i => `${i.productName} x${i.orderedQuantity}`).join(', ')}`,
+                        createdBy: req.user._id
+                    });
+                    await expense.save();
+
+                    // 3. Recalculate project otherExpenses
+                    const allProjectExpenses = await Expense.find({ projectId: project._id, paymentStatus: 'Paid' });
+                    project.otherExpenses = allProjectExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+                    await project.save();
+                }
+            }
+
+            if (paymentMethod) {
+                if (bankAccountId && paymentMethod !== 'cash' && !isChequePending) {
+                    const bankAccount = await BankAccount.findById(bankAccountId);
+                    if (!bankAccount) throw new Error('Company bank/cash account not found');
+                    bankAccount.balance = +(bankAccount.balance + payAmount).toFixed(2);
+                    await bankAccount.save();
+                }
+
+                const payment = new Payment({
+                    direction: 'received',
+                    customerId: foundCustomer._id,
+                    bankAccountId: paymentMethod !== 'cash' ? (bankAccountId || undefined) : undefined,
+                    amount: payAmount,
+                    method: paymentMethod,
+                    chequeNumber: paymentMethod === 'cheque' ? chequeNumber : undefined,
+                    chequeDate: paymentMethod === 'cheque' && chequeDate ? new Date(chequeDate) : undefined,
+                    chequeStatus: paymentMethod === 'cheque' ? (chequeStatus || 'pending') : undefined,
+                    bankName: paymentMethod === 'cheque' ? bankName : undefined,
+                    transactionReference: paymentMethod !== 'cheque' && paymentMethod !== 'cash' ? paymentReference : undefined,
+                    partyName: foundCustomer.displayName,
+                    allocations: [{
+                        documentType: 'invoice',
+                        documentId: invoice._id,
+                        documentNumber: invoice.invoiceNumber,
+                        amount: payAmount,
+                    }],
+                    receivedBy: req.user._id,
+                    createdBy: req.user._id,
+                });
+                await payment.save();
+            }
+
+            await updateCustomerBalance(foundCustomer._id);
+            await excelService.updateExcelRow('sales_order', order);
+
+            // Recalculate project financials after operation
             if (order.isGoToYard && order.projectId) {
                 try {
                     const { recalculateProjectFinancials } = await import('./projectController.js');
@@ -400,9 +396,7 @@ export const createSalesOrder = asyncHandler(async (req, res) => {
         } catch (error) {
             await SalesOrder.deleteOne({ _id: order._id });
             res.status(400);
-            throw new Error(error.message || 'POS Checkout Transaction Failed');
-        } finally {
-            session.endSession();
+            throw new Error(error.message || 'POS Checkout Failed');
         }
     } else {
         // Credit check for credit-term customers
@@ -618,20 +612,17 @@ export const changeSalesOrderStatus = asyncHandler(async (req, res) => {
         warehouseId = defaultWarehouse?._id;
     }
 
-    const session = await mongoose.startSession();
-
     try {
-        await session.withTransaction(async () => {
-            let targetWarehouse = null;
-            if (warehouseId) {
-                targetWarehouse = await Warehouse.findById(warehouseId).session(session);
-            } else {
-                targetWarehouse = await Warehouse.findOne({ isDefault: true, isActive: true }).session(session);
-            }
-            const allowNegative = targetWarehouse?.settings?.allowNegativeStock || false;
-            if (targetWarehouse) {
-                warehouseId = targetWarehouse._id;
-            }
+        let targetWarehouse = null;
+        if (warehouseId) {
+            targetWarehouse = await Warehouse.findById(warehouseId);
+        } else {
+            targetWarehouse = await Warehouse.findOne({ isDefault: true, isActive: true });
+        }
+        const allowNegative = targetWarehouse?.settings?.allowNegativeStock || false;
+        if (targetWarehouse) {
+            warehouseId = targetWarehouse._id;
+        }
 
             // ─── APPROVE: deduct stock immediately from warehouse ───────────────
             if (status === 'approved' && order.status !== 'approved') {
@@ -641,7 +632,7 @@ export const changeSalesOrderStatus = asyncHandler(async (req, res) => {
                         productId: item.productId,
                         warehouseId,
                         batchNumber: null,
-                    }).session(session);
+                    });
 
                     if (!allowNegative) {
                         if (!stockItem) {
@@ -670,7 +661,6 @@ export const changeSalesOrderStatus = asyncHandler(async (req, res) => {
                         },
                         reason: 'Sales order approved',
                         userId: req.user._id,
-                        session,
                         allowNegative,
                     });
 
@@ -719,7 +709,6 @@ export const changeSalesOrderStatus = asyncHandler(async (req, res) => {
                             },
                             reason: reason || 'Order cancelled — stock restored',
                             userId: req.user._id,
-                            session,
                         });
                     } catch (stockErr) {
                         // Non-fatal: log but don't block cancellation
@@ -742,18 +731,15 @@ export const changeSalesOrderStatus = asyncHandler(async (req, res) => {
                 order.holdReason = reason;
             }
 
-            await order.save({ session });
+            await order.save();
             
             // Sync to Excel (Bookings) - status update
             await excelService.updateExcelRow('sales_order', order);
-        });
 
         res.json({ success: true, message: `Order status changed to ${status}`, data: order });
     } catch (err) {
         res.status(400);
         throw new Error(err.message || 'Failed to change order status');
-    } finally {
-        session.endSession();
     }
 });
 

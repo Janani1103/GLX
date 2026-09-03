@@ -120,9 +120,11 @@ export default function PosPage() {
 
     // Only show sellable, non-raw-material products in POS
     const NON_SELLABLE_TYPES = ['raw_material', 'packaging', 'consumable', 'service'];
-    const products = (productsData?.data || []).filter(
-        (p) => p.canBeSold !== false && !NON_SELLABLE_TYPES.includes(p.productType)
-    );
+    const products = (productsData?.data || [])
+        .filter((p) => p.canBeSold !== false && !NON_SELLABLE_TYPES.includes(p.productType))
+        .filter((product, index, self) =>
+            index === self.findIndex((p) => p._id === product._id)
+        );
     const categories = categoriesData?.data || [];
     const stockItems = stockData?.data || [];
 
@@ -1259,25 +1261,8 @@ function CartPanel({
             )}
 
             {checkoutSuccessDetails && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 print:bg-white print:p-0">
-                    <style dangerouslySetInnerHTML={{__html: `
-                        @media print {
-                            body > * {
-                                display: none !important;
-                            }
-                            #pos-receipt-print-area {
-                                display: block !important;
-                                position: absolute;
-                                left: 0;
-                                top: 0;
-                                width: 100%;
-                                background: white;
-                                color: black;
-                                padding: 20px;
-                            }
-                        }
-                    `}} />
-                    <div id="pos-receipt-print-area" className="bg-white text-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 print:shadow-none print:p-0 print:w-full print:max-w-none">
+                <div className="print-receipt-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+                    <div id="pos-receipt-print-area" className="bg-white text-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
                         <div className="text-center border-b pb-4">
                             <h2 className="text-xl font-black text-slate-800 uppercase tracking-wider">GLX Industries</h2>
                             <p className="text-xs text-gray-500">Ja-Ela, Sri Lanka · +94 11 223 3445</p>
@@ -1324,7 +1309,84 @@ function CartPanel({
                         <div className="flex gap-2 pt-4 print:hidden">
                             <button
                                 onClick={() => {
-                                    window.print();
+                                    const printContent = document.getElementById('pos-receipt-print-area').innerHTML;
+                                    const orderNumber = checkoutSuccessDetails.order?.orderNumber || 'N/A';
+                                    const printWindow = window.open('', '', 'width=800,height=600');
+                                    printWindow.document.write(`
+                                        <html>
+                                        <head>
+                                            <title>Receipt - ` + orderNumber + `</title>
+                                            <style>
+                                                body {
+                                                    font-family: Arial, sans-serif;
+                                                    padding: 20px;
+                                                    margin: 0;
+                                                    color: #1e293b;
+                                                }
+                                                table {
+                                                    width: 100%;
+                                                    border-collapse: collapse;
+                                                }
+                                                th, td {
+                                                    padding: 8px;
+                                                    text-align: left;
+                                                    border-bottom: 1px solid #e5e7eb;
+                                                }
+                                                th {
+                                                    font-weight: bold;
+                                                }
+                                                .text-right {
+                                                    text-align: right;
+                                                }
+                                                .text-center {
+                                                    text-align: center;
+                                                }
+                                                .border-b {
+                                                    border-bottom: 2px solid #1e293b;
+                                                }
+                                                .border-t {
+                                                    border-top: 2px solid #1e293b;
+                                                }
+                                                .font-bold {
+                                                    font-weight: bold;
+                                                }
+                                                .text-sm {
+                                                    font-size: 12px;
+                                                }
+                                                .text-xs {
+                                                    font-size: 11px;
+                                                }
+                                                .space-y-1 > * + * {
+                                                    margin-top: 4px;
+                                                }
+                                                .space-y-4 > * + * {
+                                                    margin-top: 16px;
+                                                }
+                                                .mt-2 {
+                                                    margin-top: 8px;
+                                                }
+                                                .mb-2 {
+                                                    margin-bottom: 8px;
+                                                }
+                                                .py-2 {
+                                                    padding-top: 8px;
+                                                    padding-bottom: 8px;
+                                                }
+                                                .flex.gap-2.pt-4 {
+                                                    display: none !important;
+                                                }
+                                            </style>
+                                        </head>
+                                        <body>
+                                            ` + printContent + `
+                                        </body>
+                                        </html>
+                                    `);
+                                    printWindow.document.close();
+                                    printWindow.onload = function() {
+                                        printWindow.print();
+                                        printWindow.close();
+                                    };
                                 }}
                                 className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition shadow-md flex items-center justify-center gap-1.5"
                             >

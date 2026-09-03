@@ -23,6 +23,8 @@ export const damagesApi = {
     list: async (params = {}) => (await api.get('/damages', { params })).data,
     getById: async (id) => (await api.get(`/damages/${id}`)).data,
     create: async (data) => (await api.post('/damages', data)).data,
+    update: async (id, data) => (await api.put(`/damages/${id}`, data)).data,
+    delete: async (id) => (await api.delete(`/damages/${id}`)).data,
     writeOff: async (id) => (await api.patch(`/damages/${id}/write-off`)).data,
     summary: async () => (await api.get('/damages/summary')).data,
 };

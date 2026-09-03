@@ -69,7 +69,6 @@ class ReportService {
     async generatePDF({ title, columns, data, user }) {
         return new Promise((resolve, reject) => {
             const doc = new PdfPrinter({
-                bufferPages: true,
                 margin: 30,
                 size: columns.length > 7 ? 'A4' : 'A4',
                 layout: columns.length > 7 ? 'landscape' : 'portrait'
@@ -105,28 +104,13 @@ class ReportService {
                 return newRow;
             });
 
-            // Calculate column widths so the table fills the usable page width
-            const pageMarginLeft = doc.page.margins?.left ?? 30;
-            const pageMarginRight = doc.page.margins?.right ?? 30;
-            const usableWidth = doc.page.width - pageMarginLeft - pageMarginRight;
-
-            // Use provided column width hints (like Excel widths) as relative weights
-            const widthHints = columns.map(c => c.width || 20);
-            const totalHint = widthHints.reduce((s, v) => s + (v || 0), 0) || (columns.length || 1);
-
-            const headers = columns.map((c, idx) => {
-                const rel = (widthHints[idx] || 20) / totalHint;
-                return { label: c.header, property: c.key, width: Math.max(40, Math.floor(rel * usableWidth)) };
-            });
-
             const table = {
                 title: '',
-                headers,
+                headers: columns.map(c => ({ label: c.header, property: c.key, width: c.width || 80 })),
                 datas: tableData,
                 options: {
-                    width: usableWidth,
-                    padding: 6,
-                    columnSpacing: 8,
+                    padding: 5,
+                    columnSpacing: 10,
                     divider: {
                         header: { disabled: false, width: 2, opacity: 1 },
                         horizontal: { disabled: false, width: 1, opacity: 0.1 }
@@ -141,15 +125,12 @@ class ReportService {
                 const range = doc.bufferedPageRange();
                 for (let i = range.start; i < range.start + range.count; i++) {
                     doc.switchToPage(i);
-                    const oldBottomMargin = doc.page.margins.bottom;
-                    doc.page.margins.bottom = 0;
                     doc.fontSize(8).fillColor('#94A3B8').text(
                         `Page ${i + 1} of ${range.count}`,
                         0,
                         doc.page.height - 20,
-                        { align: 'center', width: doc.page.width, lineBreak: false }
+                        { align: 'center', width: doc.page.width }
                     );
-                    doc.page.margins.bottom = oldBottomMargin;
                 }
                 doc.end();
             }

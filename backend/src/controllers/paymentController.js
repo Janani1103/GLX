@@ -22,100 +22,97 @@ export const createPayment = asyncHandler(async (req, res) => {
         res.status(400); throw new Error('supplierId required for paid payments');
     }
 
-    const session = await mongoose.startSession();
     let payment;
     const isChequePending = method === 'cheque' && chequeStatus !== 'cleared';
 
     try {
-        await session.withTransaction(async () => {
-            // Validate & adjust allocations
-            for (const alloc of allocations) {
-                if (alloc.documentType === 'invoice') {
-                    const inv = await Invoice.findById(alloc.documentId).session(session);
-                    if (!inv) throw new Error(`Invoice ${alloc.documentId} not found`);
-                    if (alloc.amount > inv.balanceDue) {
-                        throw new Error(`Cannot allocate ${alloc.amount} to invoice ${inv.invoiceNumber}, balance is ${inv.balanceDue}`);
-                    }
-                    alloc.documentNumber = inv.invoiceNumber;
-                } else if (alloc.documentType === 'bill') {
-                    const bill = await Bill.findById(alloc.documentId).session(session);
-                    if (!bill) throw new Error(`Bill ${alloc.documentId} not found`);
-                    if (alloc.amount > bill.balanceDue) {
-                        throw new Error(`Cannot allocate ${alloc.amount} to bill ${bill.billNumber}, balance is ${bill.balanceDue}`);
-                    }
-                    alloc.documentNumber = bill.billNumber;
+        // Validate & adjust allocations
+        for (const alloc of allocations) {
+            if (alloc.documentType === 'invoice') {
+                const inv = await Invoice.findById(alloc.documentId);
+                if (!inv) throw new Error(`Invoice ${alloc.documentId} not found`);
+                if (alloc.amount > inv.balanceDue) {
+                    throw new Error(`Cannot allocate ${alloc.amount} to invoice ${inv.invoiceNumber}, balance is ${inv.balanceDue}`);
                 }
+                alloc.documentNumber = inv.invoiceNumber;
+            } else if (alloc.documentType === 'bill') {
+                const bill = await Bill.findById(alloc.documentId);
+                if (!bill) throw new Error(`Bill ${alloc.documentId} not found`);
+                if (alloc.amount > bill.balanceDue) {
+                    throw new Error(`Cannot allocate ${alloc.amount} to bill ${bill.billNumber}, balance is ${bill.balanceDue}`);
+                }
+                alloc.documentNumber = bill.billNumber;
             }
+        }
 
-            // Get party name
-            let partyName = '';
+        // Get party name
+        let partyName = '';
+        if (direction === 'received') {
+            const c = await Customer.findById(customerId);
+            partyName = c?.displayName;
+        } else {
+            const Supplier = (await import('../models/Supplier.js')).default;
+            const s = await Supplier.findById(supplierId);
+            partyName = s?.displayName;
+        }
+
+        // Update bank account balance if bankAccountId is provided and not a pending cheque
+        if (bankAccountId && !isChequePending) {
+            const bankAccount = await BankAccount.findById(bankAccountId);
+            if (!bankAccount) throw new Error('Company bank account not found');
+            
+            const payAmount = Number(amount || 0);
             if (direction === 'received') {
-                const c = await Customer.findById(customerId).session(session);
-                partyName = c?.displayName;
-            } else {
-                const Supplier = (await import('../models/Supplier.js')).default;
-                const s = await Supplier.findById(supplierId).session(session);
-                partyName = s?.displayName;
+                bankAccount.balance = +(bankAccount.balance + payAmount).toFixed(2);
+            } else if (direction === 'paid') {
+                bankAccount.balance = +(bankAccount.balance - payAmount).toFixed(2);
             }
+            await bankAccount.save();
+        }
 
-            // Update bank account balance if bankAccountId is provided and not a pending cheque
-            if (bankAccountId && !isChequePending) {
-                const bankAccount = await BankAccount.findById(bankAccountId).session(session);
-                if (!bankAccount) throw new Error('Company bank account not found');
-                
-                const payAmount = Number(amount || 0);
-                if (direction === 'received') {
-                    bankAccount.balance = +(bankAccount.balance + payAmount).toFixed(2);
-                } else if (direction === 'paid') {
-                    bankAccount.balance = +(bankAccount.balance - payAmount).toFixed(2);
-                }
-                await bankAccount.save({ session });
-            }
-
-            payment = new Payment({
-                direction,
-                customerId: direction === 'received' ? customerId : undefined,
-                supplierId: direction === 'paid' ? supplierId : undefined,
-                bankAccountId,
-                amount,
-                method,
-                chequeStatus: method === 'cheque' ? (chequeStatus || 'pending') : undefined,
-                partyName,
-                allocations,
-                receivedBy: req.user._id,
-                createdBy: req.user._id,
-                ...rest,
-            });
-
-            await payment.save({ session });
-
-            // Apply allocations to invoices/bills
-            for (const alloc of allocations) {
-                if (alloc.documentType === 'invoice') {
-                    const inv = await Invoice.findById(alloc.documentId).session(session);
-                    inv.amountPaid = +(inv.amountPaid + alloc.amount).toFixed(2);
-                    inv.lastPaymentDate = payment.paymentDate;
-                    await inv.save({ session });
-                } else if (alloc.documentType === 'bill') {
-                    const bill = await Bill.findById(alloc.documentId).session(session);
-                    bill.amountPaid = +(bill.amountPaid + alloc.amount).toFixed(2);
-                    bill.lastPaymentDate = payment.paymentDate;
-                    await bill.save({ session });
-                }
-            }
-
-            // Update customer balance if received
-            if (direction === 'received') {
-                await updateCustomerBalance(customerId, session);
-            }
-            try {
-                broadcast('financial_update', {
-                    message: 'Financial accounts updated via new payment log',
-                });
-            } catch (_) {}
+        payment = new Payment({
+            direction,
+            customerId: direction === 'received' ? customerId : undefined,
+            supplierId: direction === 'paid' ? supplierId : undefined,
+            bankAccountId,
+            amount,
+            method,
+            chequeStatus: method === 'cheque' ? (chequeStatus || 'pending') : undefined,
+            partyName,
+            allocations,
+            receivedBy: req.user._id,
+            createdBy: req.user._id,
+            ...rest,
         });
 
-        // Broadcast bank account balance change after successful transaction commit
+        await payment.save();
+
+        // Apply allocations to invoices/bills
+        for (const alloc of allocations) {
+            if (alloc.documentType === 'invoice') {
+                const inv = await Invoice.findById(alloc.documentId);
+                inv.amountPaid = +(inv.amountPaid + alloc.amount).toFixed(2);
+                inv.lastPaymentDate = payment.paymentDate;
+                await inv.save();
+            } else if (alloc.documentType === 'bill') {
+                const bill = await Bill.findById(alloc.documentId);
+                bill.amountPaid = +(bill.amountPaid + alloc.amount).toFixed(2);
+                bill.lastPaymentDate = payment.paymentDate;
+                await bill.save();
+            }
+        }
+
+        // Update customer balance if received
+        if (direction === 'received') {
+            await updateCustomerBalance(customerId);
+        }
+        try {
+            broadcast('financial_update', {
+                message: 'Financial accounts updated via new payment log',
+            });
+        } catch (_) {}
+
+        // Broadcast bank account balance change after successful save
         if (bankAccountId && !isChequePending) {
             const updatedAccount = await BankAccount.findById(bankAccountId);
             if (updatedAccount) {
@@ -135,8 +132,6 @@ export const createPayment = asyncHandler(async (req, res) => {
     } catch (err) {
         res.status(400);
         throw new Error(err.message || 'Failed to create payment');
-    } finally {
-        session.endSession();
     }
 });
 
@@ -159,25 +154,22 @@ export const clearPaymentCheque = asyncHandler(async (req, res) => {
         throw new Error('Cheque is already cleared');
     }
 
-    const session = await mongoose.startSession();
     try {
-        await session.withTransaction(async () => {
-            payment.chequeStatus = 'cleared';
-            await payment.save({ session });
+        payment.chequeStatus = 'cleared';
+        await payment.save();
 
-            if (payment.bankAccountId) {
-                const bankAccount = await BankAccount.findById(payment.bankAccountId).session(session);
-                if (!bankAccount) throw new Error('Associated company bank account not found');
+        if (payment.bankAccountId) {
+            const bankAccount = await BankAccount.findById(payment.bankAccountId);
+            if (!bankAccount) throw new Error('Associated company bank account not found');
 
-                const payAmount = Number(payment.amount || 0);
-                if (payment.direction === 'received') {
-                    bankAccount.balance = +(bankAccount.balance + payAmount).toFixed(2);
-                } else if (payment.direction === 'paid') {
-                    bankAccount.balance = +(bankAccount.balance - payAmount).toFixed(2);
-                }
-                await bankAccount.save({ session });
+            const payAmount = Number(payment.amount || 0);
+            if (payment.direction === 'received') {
+                bankAccount.balance = +(bankAccount.balance + payAmount).toFixed(2);
+            } else if (payment.direction === 'paid') {
+                bankAccount.balance = +(bankAccount.balance - payAmount).toFixed(2);
             }
-        });
+            await bankAccount.save();
+        }
 
         // Broadcast bank balance update
         if (payment.bankAccountId) {
@@ -212,8 +204,6 @@ export const clearPaymentCheque = asyncHandler(async (req, res) => {
     } catch (err) {
         res.status(400);
         throw new Error(err.message || 'Failed to clear cheque');
-    } finally {
-        session.endSession();
     }
 });
 
@@ -245,38 +235,35 @@ export const updatePaymentChequeStatus = asyncHandler(async (req, res) => {
         return res.json({ success: true, message: 'Status is already set to ' + newStatus, data: payment });
     }
 
-    const session = await mongoose.startSession();
     try {
-        await session.withTransaction(async () => {
-            payment.chequeStatus = newStatus;
-            await payment.save({ session });
+        payment.chequeStatus = newStatus;
+        await payment.save();
 
-            if (payment.bankAccountId) {
-                const bankAccount = await BankAccount.findById(payment.bankAccountId).session(session);
-                if (!bankAccount) throw new Error('Associated company bank account not found');
+        if (payment.bankAccountId) {
+            const bankAccount = await BankAccount.findById(payment.bankAccountId);
+            if (!bankAccount) throw new Error('Associated company bank account not found');
 
-                const payAmount = Number(payment.amount || 0);
+            const payAmount = Number(payment.amount || 0);
 
-                // If transitioning from cleared -> non-cleared, reverse the bank balance adjustment
-                if (oldStatus === 'cleared' && newStatus !== 'cleared') {
-                    if (payment.direction === 'received') {
-                        bankAccount.balance = +(bankAccount.balance - payAmount).toFixed(2);
-                    } else if (payment.direction === 'paid') {
-                        bankAccount.balance = +(bankAccount.balance + payAmount).toFixed(2);
-                    }
-                    await bankAccount.save({ session });
+            // If transitioning from cleared -> non-cleared, reverse the bank balance adjustment
+            if (oldStatus === 'cleared' && newStatus !== 'cleared') {
+                if (payment.direction === 'received') {
+                    bankAccount.balance = +(bankAccount.balance - payAmount).toFixed(2);
+                } else if (payment.direction === 'paid') {
+                    bankAccount.balance = +(bankAccount.balance + payAmount).toFixed(2);
                 }
-                // If transitioning from non-cleared -> cleared, apply the bank balance adjustment
-                else if (oldStatus !== 'cleared' && newStatus === 'cleared') {
-                    if (payment.direction === 'received') {
-                        bankAccount.balance = +(bankAccount.balance + payAmount).toFixed(2);
-                    } else if (payment.direction === 'paid') {
-                        bankAccount.balance = +(bankAccount.balance - payAmount).toFixed(2);
-                    }
-                    await bankAccount.save({ session });
-                }
+                await bankAccount.save();
             }
-        });
+            // If transitioning from non-cleared -> cleared, apply the bank balance adjustment
+            else if (oldStatus !== 'cleared' && newStatus === 'cleared') {
+                if (payment.direction === 'received') {
+                    bankAccount.balance = +(bankAccount.balance + payAmount).toFixed(2);
+                } else if (payment.direction === 'paid') {
+                    bankAccount.balance = +(bankAccount.balance - payAmount).toFixed(2);
+                }
+                await bankAccount.save();
+            }
+        }
 
         // Broadcast bank balance update if bankAccountId was adjusted
         if (payment.bankAccountId && (oldStatus === 'cleared' || newStatus === 'cleared')) {
@@ -312,8 +299,6 @@ export const updatePaymentChequeStatus = asyncHandler(async (req, res) => {
     } catch (err) {
         res.status(400);
         throw new Error(err.message || 'Failed to update cheque status');
-    } finally {
-        session.endSession();
     }
 });
 
@@ -427,113 +412,110 @@ export const createVoucher = asyncHandler(async (req, res) => {
         res.status(400); throw new Error('Valid positive voucher amount is required');
     }
 
-    const session = await mongoose.startSession();
     let voucher;
 
     try {
-        await session.withTransaction(async () => {
-            let resolvedPartyName = partyName || '';
+        let resolvedPartyName = partyName || '';
 
-            // Handle party name resolution and party validation
-            if (voucherType === 'customer_advance_refund') {
-                if (!customerId) throw new Error('customerId is required for Customer Advance Refund');
-                const c = await Customer.findById(customerId).session(session);
-                if (!c) throw new Error('Customer not found');
-                resolvedPartyName = c.displayName || c.companyName || `${c.firstName} ${c.lastName}`;
-            } else if (voucherType === 'supplier_payment') {
-                if (!supplierId) throw new Error('supplierId is required for Supplier Payment');
-                const Supplier = (await import('../models/Supplier.js')).default;
-                const s = await Supplier.findById(supplierId).session(session);
-                if (!s) throw new Error('Supplier not found');
-                resolvedPartyName = s.displayName || s.companyName;
-            } else if (voucherType === 'labor_advance' || voucherType === 'salary_advance') {
-                if (!employeeId) throw new Error('Employee selection is required for Labor Advance Voucher');
-                const Employee = (await import('../models/Employee.js')).default;
-                const emp = await Employee.findById(employeeId).session(session);
-                if (!emp) throw new Error('Employee not found');
-                resolvedPartyName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.employeeCode || 'Employee';
-            }
+        // Handle party name resolution and party validation
+        if (voucherType === 'customer_advance_refund') {
+            if (!customerId) throw new Error('customerId is required for Customer Advance Refund');
+            const c = await Customer.findById(customerId);
+            if (!c) throw new Error('Customer not found');
+            resolvedPartyName = c.displayName || c.companyName || `${c.firstName} ${c.lastName}`;
+        } else if (voucherType === 'supplier_payment') {
+            if (!supplierId) throw new Error('supplierId is required for Supplier Payment');
+            const Supplier = (await import('../models/Supplier.js')).default;
+            const s = await Supplier.findById(supplierId);
+            if (!s) throw new Error('Supplier not found');
+            resolvedPartyName = s.displayName || s.companyName;
+        } else if (voucherType === 'labor_advance' || voucherType === 'salary_advance') {
+            if (!employeeId) throw new Error('Employee selection is required for Labor Advance Voucher');
+            const Employee = (await import('../models/Employee.js')).default;
+            const emp = await Employee.findById(employeeId);
+            if (!emp) throw new Error('Employee not found');
+            resolvedPartyName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.employeeCode || 'Employee';
+        }
 
-            // Update bank account if provided
-            if (bankAccountId) {
-                const bankAccount = await BankAccount.findById(bankAccountId).session(session);
-                if (!bankAccount) throw new Error('Selected bank account not found');
-                bankAccount.balance = +(bankAccount.balance - numAmount).toFixed(2);
-                await bankAccount.save({ session });
-            }
+        // Update bank account if provided
+        if (bankAccountId) {
+            const bankAccount = await BankAccount.findById(bankAccountId);
+            if (!bankAccount) throw new Error('Selected bank account not found');
+            bankAccount.balance = +(bankAccount.balance - numAmount).toFixed(2);
+            await bankAccount.save();
+        }
 
-            // Create Voucher payment doc
-            voucher = new Payment({
-                direction: 'paid',
-                voucherType,
-                voucherCategory: voucherType,
-                customerId: voucherType === 'customer_advance_refund' ? customerId : undefined,
-                supplierId: voucherType === 'supplier_payment' ? supplierId : undefined,
-                employeeId: (voucherType === 'labor_advance' || voucherType === 'salary_advance') ? employeeId : undefined,
-                partyName: resolvedPartyName,
-                bankAccountId,
+        // Create Voucher payment doc
+        voucher = new Payment({
+            direction: 'paid',
+            voucherType,
+            voucherCategory: voucherType,
+            customerId: voucherType === 'customer_advance_refund' ? customerId : undefined,
+            supplierId: voucherType === 'supplier_payment' ? supplierId : undefined,
+            employeeId: (voucherType === 'labor_advance' || voucherType === 'salary_advance') ? employeeId : undefined,
+            partyName: resolvedPartyName,
+            bankAccountId,
+            amount: numAmount,
+            method,
+            chequeNumber,
+            chequeDate: chequeDate ? new Date(chequeDate) : undefined,
+            bankName,
+            transactionReference,
+            hireNoteNumber,
+            vehicleNo,
+            transportDriver,
+            notes,
+            signatureNote,
+            allocations,
+            receivedBy: req.user._id,
+            createdBy: req.user._id,
+        });
+
+        await voucher.save();
+
+        // If voucher is labor_advance or salary_advance, auto-create SalaryAdvance record for payroll deduction
+        if ((voucherType === 'labor_advance' || voucherType === 'salary_advance') && employeeId) {
+            const SalaryAdvance = (await import('../models/SalaryAdvance.js')).default;
+            await SalaryAdvance.create([{
+                employeeId,
+                date: voucher.paymentDate || new Date(),
+                advanceType: 'amount',
                 amount: numAmount,
-                method,
-                chequeNumber,
-                chequeDate: chequeDate ? new Date(chequeDate) : undefined,
-                bankName,
-                transactionReference,
-                hireNoteNumber,
-                vehicleNo,
-                transportDriver,
-                notes,
-                signatureNote,
-                allocations,
-                receivedBy: req.user._id,
+                reason: notes || `Payment Voucher Advance: ${voucher.paymentNumber}`,
+                status: 'approved',
+                approvedBy: req.user._id,
+                approvedAt: new Date(),
                 createdBy: req.user._id,
-            });
+            }]);
+        }
 
-            await voucher.save({ session });
-
-            // If voucher is labor_advance or salary_advance, auto-create SalaryAdvance record for payroll deduction
-            if ((voucherType === 'labor_advance' || voucherType === 'salary_advance') && employeeId) {
-                const SalaryAdvance = (await import('../models/SalaryAdvance.js')).default;
-                await SalaryAdvance.create([{
-                    employeeId,
-                    date: voucher.paymentDate || new Date(),
-                    advanceType: 'amount',
-                    amount: numAmount,
-                    reason: notes || `Payment Voucher Advance: ${voucher.paymentNumber}`,
-                    status: 'approved',
-                    approvedBy: req.user._id,
-                    approvedAt: new Date(),
-                    createdBy: req.user._id,
-                }], { session });
-            }
-
-            // Apply allocations or update document amounts
-            for (const alloc of allocations) {
-                if (alloc.documentType === 'invoice' && alloc.documentId) {
-                    const inv = await Invoice.findById(alloc.documentId).session(session);
-                    if (inv) {
-                        if (voucherType === 'customer_advance_refund') {
-                            inv.amountPaid = Math.max(0, +(inv.amountPaid - alloc.amount).toFixed(2));
-                        } else {
-                            inv.amountPaid = +(inv.amountPaid + alloc.amount).toFixed(2);
-                        }
-                        inv.lastPaymentDate = voucher.paymentDate;
-                        await inv.save({ session });
+        // Apply allocations or update document amounts
+        for (const alloc of allocations) {
+            if (alloc.documentType === 'invoice' && alloc.documentId) {
+                const inv = await Invoice.findById(alloc.documentId);
+                if (inv) {
+                    if (voucherType === 'customer_advance_refund') {
+                        inv.amountPaid = Math.max(0, +(inv.amountPaid - alloc.amount).toFixed(2));
+                    } else {
+                        inv.amountPaid = +(inv.amountPaid + alloc.amount).toFixed(2);
                     }
-                } else if (alloc.documentType === 'bill' && alloc.documentId) {
-                    const bill = await Bill.findById(alloc.documentId).session(session);
-                    if (bill) {
-                        bill.amountPaid = +(bill.amountPaid + alloc.amount).toFixed(2);
-                        bill.lastPaymentDate = voucher.paymentDate;
-                        await bill.save({ session });
-                    }
+                    inv.lastPaymentDate = voucher.paymentDate;
+                    await inv.save();
+                }
+            } else if (alloc.documentType === 'bill' && alloc.documentId) {
+                const bill = await Bill.findById(alloc.documentId);
+                if (bill) {
+                    bill.amountPaid = +(bill.amountPaid + alloc.amount).toFixed(2);
+                    bill.lastPaymentDate = voucher.paymentDate;
+                    await bill.save();
                 }
             }
+        }
 
-            // Update customer balance if advance refund
-            if (voucherType === 'customer_advance_refund' && customerId) {
-                await updateCustomerBalance(customerId, session);
-            }
-        });
+        // Update customer balance if advance refund
+        if (voucherType === 'customer_advance_refund' && customerId) {
+            await updateCustomerBalance(customerId);
+        }
 
         // Broadcast financial update
         try {
@@ -553,8 +535,6 @@ export const createVoucher = asyncHandler(async (req, res) => {
     } catch (err) {
         res.status(400);
         throw new Error(err.message || 'Failed to issue voucher');
-    } finally {
-        session.endSession();
     }
 });
 
@@ -728,4 +708,4 @@ export const getDocumentPaymentSummary = asyncHandler(async (req, res) => {
         count: auditLogs.length,
         payments: auditLogs,
     });
-});
+});

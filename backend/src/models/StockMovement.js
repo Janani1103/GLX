@@ -14,7 +14,6 @@ const stockMovementSchema = new mongoose.Schema(
         movementType: {
             type: String,
             required: false,
-            type: String,
         },
 
         direction: { type: String, required: false },
@@ -35,10 +34,7 @@ const stockMovementSchema = new mongoose.Schema(
 
         // Source document (what caused this movement)
         sourceDocument: {
-            type: {
-                type: String,
-                type: String,
-            },
+            type: { type: String },
             id: { type: mongoose.Schema.Types.ObjectId },
             number: { type: String, trim: true },
         },

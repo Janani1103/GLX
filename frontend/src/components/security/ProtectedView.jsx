@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldAlert, Lock, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
@@ -18,14 +18,24 @@ export default function ProtectedView({
 }) {
     const { user } = useAuthStore();
     const [isBlurred, setIsBlurred] = useState(false);
+    const [isPrinting, setIsPrinting] = useState(false);
     const [screenshotBlockedAlert, setScreenshotBlockedAlert] = useState(false);
-    const isPrintingRef = useRef(false);
 
     useEffect(() => {
+        const handleBeforePrint = () => {
+            setIsPrinting(true);
+            setIsBlurred(false);
+        };
+        const handleAfterPrint = () => {
+            setIsPrinting(false);
+        };
+
+        window.addEventListener('beforeprint', handleBeforePrint);
+        window.addEventListener('afterprint', handleAfterPrint);
+
         // 1. Detect Loss of Window Focus (Snipping tool / Win+Shift+S / Alt+Tab / Screen recording tool focus grab)
         const handleBlur = () => {
-            if (isPrintingRef.current) return;
-            if (blurOnFocusLoss) {
+            if (blurOnFocusLoss && !isPrinting) {
                 setIsBlurred(true);
             }
         };
@@ -35,8 +45,7 @@ export default function ProtectedView({
         };
 
         const handleVisibilityChange = () => {
-            if (isPrintingRef.current) return;
-            if (document.hidden && blurOnFocusLoss) {
+            if (document.hidden && blurOnFocusLoss && !isPrinting) {
                 setIsBlurred(true);
             } else {
                 setIsBlurred(false);
@@ -83,21 +92,9 @@ export default function ProtectedView({
             triggerSecurityAlert('Text selection & copying restricted');
         };
 
-        const handleBeforePrint = () => {
-            isPrintingRef.current = true;
-            setIsBlurred(false);
-        };
-
-        const handleAfterPrint = () => {
-            isPrintingRef.current = false;
-            setIsBlurred(false);
-        };
-
         window.addEventListener('blur', handleBlur);
         window.addEventListener('focus', handleFocus);
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('beforeprint', handleBeforePrint);
-        window.addEventListener('afterprint', handleAfterPrint);
         window.addEventListener('keydown', handleKeyDown, true);
         window.addEventListener('keyup', (e) => {
             if (e.key === 'PrintScreen') {
@@ -108,14 +105,14 @@ export default function ProtectedView({
         });
 
         return () => {
+            window.removeEventListener('beforeprint', handleBeforePrint);
+            window.removeEventListener('afterprint', handleAfterPrint);
             window.removeEventListener('blur', handleBlur);
             window.removeEventListener('focus', handleFocus);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('beforeprint', handleBeforePrint);
-            window.removeEventListener('afterprint', handleAfterPrint);
             window.removeEventListener('keydown', handleKeyDown, true);
         };
-    }, [blurOnFocusLoss, preventDevTools]);
+    }, [blurOnFocusLoss, preventDevTools, isPrinting]);
 
     const triggerSecurityAlert = (reason) => {
         setScreenshotBlockedAlert(true);
@@ -145,7 +142,7 @@ export default function ProtectedView({
             }}
         >
             {/* Focus Loss / Snipping Shield Overlay */}
-            {isBlurred && (
+            {isBlurred && !isPrinting && (
                 <div className="no-print absolute inset-0 z-[9999] bg-slate-900/95 backdrop-blur-xl flex flex-col items-center justify-center text-white p-6 text-center shadow-2xl transition-all duration-200">
                     <div className="w-16 h-16 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center mb-4 animate-pulse">
                         <EyeOff size={32} className="text-rose-400" />
@@ -174,7 +171,7 @@ export default function ProtectedView({
             )}
 
             {/* Protected Content */}
-            <div className={`protected-view-content ${isBlurred ? 'filter blur-lg transition-all' : ''}`}>
+            <div className={isBlurred && !isPrinting ? 'filter blur-lg transition-all' : ''}>
                 {children}
             </div>
         </div>

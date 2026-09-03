@@ -77,34 +77,6 @@ export const getAttendanceReport = asyncHandler(async (req, res) => {
                     totalOvertimeMinutes: { $sum: '$overtimeMinutes' },
                 },
             },
-            {
-                $lookup: {
-                    from: 'employees',
-                    localField: '_id',
-                    foreignField: '_id',
-                    as: 'emp',
-                },
-            },
-            { $unwind: { path: '$emp', preserveNullAndEmptyArrays: true } },
-            {
-                $project: {
-                    _id: 1,
-                    employeeName: {
-                        $ifNull: [
-                            '$employeeName',
-                            { $trim: { input: { $concat: [{ $ifNull: ['$emp.firstName', ''] }, ' ', { $ifNull: ['$emp.lastName', ''] }] } } }
-                        ]
-                    },
-                    employeeCode: { $ifNull: ['$employeeCode', '$emp.employeeCode'] },
-                    present: 1,
-                    absent: 1,
-                    late: 1,
-                    leave: 1,
-                    halfDay: 1,
-                    totalLateMinutes: 1,
-                    totalOvertimeMinutes: 1,
-                },
-            },
             { $sort: { present: -1 } },
         ]),
     ]);

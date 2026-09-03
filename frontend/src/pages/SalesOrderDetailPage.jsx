@@ -63,9 +63,6 @@ export default function SalesOrderDetailPage() {
     if (order.status === 'dispatched' && canDispatch) {
         actionButtons.push({ label: 'Mark Delivered', icon: PackageCheck, variant: 'primary', status: 'delivered' });
     }
-    if (order.status === 'delivered' && canApprove) {
-        actionButtons.push({ label: 'Mark Completed', icon: CheckCircle, variant: 'primary', status: 'completed' });
-    }
     if (order.status === 'delivered' && !order.invoiceId && canApprove) {
         actionButtons.push({
             label: 'Create Invoice',
@@ -81,6 +78,9 @@ export default function SalesOrderDetailPage() {
             variant: 'outline',
             onClick: () => navigate(`/invoices/${order.invoiceId._id || order.invoiceId}`),
         });
+    }
+    if (order.status === 'delivered' && order.invoiceId && canApprove) {
+        actionButtons.push({ label: 'Mark Completed', icon: CheckCircle, variant: 'primary', status: 'completed' });
     }
     if (!['completed', 'cancelled'].includes(order.status) && canCancel) {
         actionButtons.push({ label: 'Cancel', icon: Ban, variant: 'danger', status: 'cancelled', needsReason: true });

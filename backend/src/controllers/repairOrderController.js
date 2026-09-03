@@ -117,53 +117,42 @@ export const completeRepair = asyncHandler(async (req, res) => {
         res.status(400); throw new Error('Repair not in progress');
     }
 
-    const session = await mongoose.startSession();
+    repair.actualLaborHours = actualLaborHours || 0;
+    repair.actualLaborCost = actualLaborCost || 0;
+    repair.actualPartsCost = actualPartsCost || 0;
+    repair.completedAt = new Date();
+    repair.disposition = disposition || 'pending';
+    repair.notes = notes || repair.notes;
 
-    try {
-        await session.withTransaction(async () => {
-            repair.actualLaborHours = actualLaborHours || 0;
-            repair.actualLaborCost = actualLaborCost || 0;
-            repair.actualPartsCost = actualPartsCost || 0;
-            repair.completedAt = new Date();
-            repair.disposition = disposition || 'pending';
-            repair.notes = notes || repair.notes;
+    if (outcome === 'fixed') {
+        repair.status = 'completed_fixed';
 
-            if (outcome === 'fixed') {
-                repair.status = 'completed_fixed';
-
-                if (disposition === 'return_to_stock' && returnedToWarehouseId) {
-                    const product = await Product.findById(repair.productId).session(session);
-                    const result = await increaseStock({
-                        productId: repair.productId,
-                        warehouseId: returnedToWarehouseId,
-                        quantity: repair.quantity,
-                        costPerUnit: product?.costs?.averageCost || 0,
-                        movementType: 'repair_in',
-                        sourceDocument: {
-                            type: 'repair_order',
-                            id: repair._id,
-                            number: repair.repairNumber,
-                        },
-                        reason: `Repaired and restocked from ${repair.repairNumber}`,
-                        userId: req.user._id,
-                        session,
-                    });
-                    repair.stockMovementId = result.movement._id;
-                    repair.returnedToWarehouseId = returnedToWarehouseId;
-                }
-            } else {
-                repair.status = 'completed_unfixable';
-            }
-
-            await repair.save({ session });
-        });
-
-        res.json({ success: true, data: repair });
-    } catch (err) {
-        res.status(400); throw new Error(err.message);
-    } finally {
-        session.endSession();
+        if (disposition === 'return_to_stock' && returnedToWarehouseId) {
+            const product = await Product.findById(repair.productId);
+            const result = await increaseStock({
+                productId: repair.productId,
+                warehouseId: returnedToWarehouseId,
+                quantity: repair.quantity,
+                costPerUnit: product?.costs?.averageCost || 0,
+                movementType: 'repair_in',
+                sourceDocument: {
+                    type: 'repair_order',
+                    id: repair._id,
+                    number: repair.repairNumber,
+                },
+                reason: `Repaired and restocked from ${repair.repairNumber}`,
+                userId: req.user._id,
+            });
+            repair.stockMovementId = result.movement._id;
+            repair.returnedToWarehouseId = returnedToWarehouseId;
+        }
+    } else {
+        repair.status = 'completed_unfixable';
     }
+
+    await repair.save();
+
+    res.json({ success: true, data: repair });
 });
 
 export const startRepair = asyncHandler(async (req, res) => {

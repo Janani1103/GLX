@@ -3,11 +3,30 @@ import {
     Scale, HelpCircle, FileText, ArrowUpRight, 
     Calculator, DollarSign, Download, Calendar
 } from 'lucide-react';
+import { exportToPDF } from '../utils/dataExport';
 
 export default function IncomeTaxPage() {
     const [taxYear, setTaxYear] = useState('2025/2026');
     const [quarter, setQuarter] = useState('Q1');
     const [loading, setLoading] = useState(false);
+
+    const handleDownloadPDF = () => {
+        const columns = [
+            { header: 'Tax Category', dataKey: 'category' },
+            { header: 'Description', dataKey: 'description' },
+            { header: 'Amount (LKR)', dataKey: 'amount' },
+            { header: 'Status', dataKey: 'status' }
+        ];
+
+        const data = [
+            { category: 'Corporate Income Tax', description: 'Quarterly Installment Due', amount: taxAssessments.corporateTax.taxLiability, status: taxAssessments.corporateTax.payable > 0 ? 'Partial Payment' : 'Fully Paid' },
+            { category: 'APIT / PAYE', description: 'Employee Withholdings', amount: taxAssessments.apitPaye.apitWithheld, status: 'Fully Settled' },
+            { category: 'Withholding Tax (WHT)', description: 'Service Provider Withholdings', amount: taxAssessments.whtTax.whtWithheld, status: taxAssessments.whtTax.payable > 0 ? 'Partial Payment' : 'Fully Paid' }
+        ];
+
+        const fileName = `Tax_Statement_${taxYear}_${quarter}`;
+        exportToPDF('Statutory Tax Ledger Statement', columns, data, fileName);
+    };
 
     // Stub tax computations
     const taxAssessments = {
@@ -131,7 +150,7 @@ export default function IncomeTaxPage() {
                         <p className="text-[11px] text-slate-400">Quarterly tax calculation sheet</p>
                     </div>
                     <button 
-                        onClick={() => alert('Tax report downloaded')} 
+                        onClick={handleDownloadPDF} 
                         className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold py-1.5 px-3 flex items-center gap-1.5 transition"
                     >
                         <Download size={12} />

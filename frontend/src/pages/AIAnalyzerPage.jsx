@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
     Sparkles, Send, Bot, User, CheckCircle, 
     AlertTriangle, Lightbulb, RefreshCw, BarChart2
 } from 'lucide-react';
+import { predictionsApi } from '../features/reports/reportsApi';
 
 const MODULES = [
     { id: 'sales', name: 'Sales & CRM', icon: BarChart2, description: 'Analyze inquiries, conversions, and quotation margins.' },
@@ -84,13 +86,74 @@ export default function AIAnalyzerPage() {
     const [chatInput, setChatInput] = useState('');
     const [sending, setSending] = useState(false);
 
+    // Fetch real predictions data
+    const { data: predictionsData, isLoading: predictionsLoading, refetch: refetchPredictions } = useQuery({
+        queryKey: ['predictions', 'dashboard'],
+        queryFn: predictionsApi.dashboard,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+
+    // Update results when predictions data is loaded
+    useEffect(() => {
+        if (predictionsData?.data && !predictionsLoading) {
+            updateResultsWithRealData(predictionsData.data);
+        }
+    }, [predictionsData, predictionsLoading, updateResultsWithRealData]);
+
     const handleRunAnalysis = () => {
         setAnalyzing(true);
+        refetchPredictions();
         setTimeout(() => {
-            setResults(PRESET_INSIGHTS[selectedModule]);
+            if (predictionsData?.data) {
+                updateResultsWithRealData(predictionsData.data);
+            }
             setAnalyzing(false);
         }, 1200);
     };
+
+    const updateResultsWithRealData = useCallback((data) => {
+        const stockDepletion = data.stockDepletion || [];
+        const criticalItems = stockDepletion.filter(item => item.riskLevel === 'critical').slice(0, 3);
+        const salesProjections = data.salesProjections || {};
+        
+        let moduleResults = { ...PRESET_INSIGHTS[selectedModule] };
+
+        if (selectedModule === 'inventory') {
+            moduleResults.anomalies = criticalItems.map(item => 
+                `${item.productName} (${item.productCode}) has only ${item.availableStock} ${item.unitOfMeasure} remaining - ${item.daysRemaining} days of stock left based on current sales velocity.`
+            );
+            
+            moduleResults.recommendations = criticalItems.map(item =>
+                `Reorder ${item.productName} immediately. Current stock (${item.availableStock} ${item.unitOfMeasure}) is below minimum level (${item.minStockLevel}).`
+            );
+            
+            const totalProducts = stockDepletion.length;
+            const criticalCount = criticalItems.length;
+            const healthScore = totalProducts > 0 ? Math.max(0, 100 - (criticalCount / totalProducts * 50)) : 100;
+            moduleResults.score = healthScore >= 80 ? 'A' : healthScore >= 60 ? 'B' : 'C';
+            moduleResults.summary = `Monitoring ${totalProducts} products. ${criticalCount} items at critical stock levels. Sales velocity analysis based on last 30 days of invoice data.`;
+        } else if (selectedModule === 'sales') {
+            const trendDirection = salesProjections.weeklyTrendDirection || 'stable';
+            const growthRate = salesProjections.weeklyGrowthRate || 0;
+            
+            moduleResults.summary = `Sales trend is ${trendDirection} with a ${growthRate > 0 ? '+' : ''}${growthRate.toFixed(1)}% weekly growth rate. Next 4 weeks projected revenue: LKR ${(salesProjections.next4Weeks || 0).toLocaleString()}.`;
+            
+            if (trendDirection === 'increasing' && growthRate > 5) {
+                moduleResults.anomalies = ['Strong upward sales trend detected - consider increasing inventory for high-performing products.'];
+                moduleResults.recommendations = ['Capitalize on momentum by reviewing stock levels for top-selling items.', 'Analyze which products are driving the growth for focused marketing.'];
+            } else if (trendDirection === 'decreasing') {
+                moduleResults.anomalies = ['Sales declining - investigate potential causes such as seasonality, competition, or pricing.'];
+                moduleResults.recommendations = ['Review pricing strategy and competitor activities.', 'Reach out to key customers for feedback on recent purchases.'];
+            } else {
+                moduleResults.anomalies = ['Sales performance is stable. Consider promotional activities to drive growth.'];
+                moduleResults.recommendations = ['Launch targeted promotions for slow-moving inventory.', 'Focus on upselling and cross-selling opportunities.'];
+            }
+            
+            moduleResults.score = trendDirection === 'increasing' ? 'A' : trendDirection === 'stable' ? 'B' : 'C';
+        }
+
+        setResults(moduleResults);
+    }, [selectedModule]);
 
     const handleSendMessage = (textToSend) => {
         const query = textToSend || chatInput;
@@ -104,17 +167,65 @@ export default function AIAnalyzerPage() {
             const lowerQuery = query.toLowerCase().trim();
             let botText = "I have analyzed the current database records. While I don't have a direct answer for this specific query, overall business operations are running smoothly with no critical anomalies detected.";
             
-            // Look for matching preset response
-            for (const key of Object.keys(CHAT_RESPONSES)) {
-                if (lowerQuery.includes(key) || key.includes(lowerQuery)) {
-                    botText = CHAT_RESPONSES[key];
-                    break;
+            // First try to generate response from real predictions data
+            if (predictionsData?.data) {
+                botText = generateResponseFromRealData(lowerQuery, predictionsData.data);
+            }
+            
+            // Fall back to preset responses if no real data match
+            if (botText === "I have analyzed the current database records. While I don't have a direct answer for this specific query, overall business operations are running smoothly with no critical anomalies detected.") {
+                for (const key of Object.keys(CHAT_RESPONSES)) {
+                    if (lowerQuery.includes(key) || key.includes(lowerQuery)) {
+                        botText = CHAT_RESPONSES[key];
+                        break;
+                    }
                 }
             }
 
             setMessages(prev => [...prev, { sender: 'bot', text: botText }]);
             setSending(false);
         }, 1000);
+    };
+
+    const generateResponseFromRealData = (query, data) => {
+        const lowerQuery = query.toLowerCase();
+        
+        // Stock-related queries
+        if (lowerQuery.includes('stock') || lowerQuery.includes('inventory') || lowerQuery.includes('product')) {
+            const stockDepletion = data.stockDepletion || [];
+            const criticalItems = stockDepletion.filter(item => item.riskLevel === 'critical').slice(0, 5);
+            
+            if (criticalItems.length > 0) {
+                const itemsList = criticalItems.map(item => 
+                    `• ${item.productName} (${item.productCode}): ${item.availableStock} ${item.unitOfMeasure} remaining (${item.daysRemaining} days)`
+                ).join('\n');
+                
+                return `**Stock Analysis Results:**\n\n${criticalItems.length} products are at critical stock levels:\n${itemsList}\n\n**Recommendation:** Immediate reordering suggested for these items to prevent stockouts.`;
+            } else {
+                return `**Stock Status:** All ${stockDepletion.length} monitored products have healthy stock levels. No critical shortages detected based on 30-day sales velocity analysis.`;
+            }
+        }
+        
+        // Sales-related queries
+        if (lowerQuery.includes('sales') || lowerQuery.includes('revenue') || lowerQuery.includes('forecast')) {
+            const salesProjections = data.salesProjections || {};
+            const trend = salesProjections.weeklyTrendDirection || 'stable';
+            const growth = salesProjections.weeklyGrowthRate || 0;
+            const next4Weeks = salesProjections.next4Weeks || 0;
+            
+            return `**Sales Forecast Analysis:**\n\n• Current Trend: ${trend.toUpperCase()} (${growth > 0 ? '+' : ''}${growth.toFixed(1)}% weekly growth)\n• Next 4 Weeks Projected Revenue: LKR ${next4Weeks.toLocaleString()}\n• Next 8 Weeks Projected Revenue: LKR ${(salesProjections.next8Weeks || 0).toLocaleString()}\n\n**Insight:** ${trend === 'increasing' ? 'Sales momentum is strong - consider inventory expansion.' : trend === 'decreasing' ? 'Review pricing and market conditions.' : 'Stable performance - focus on growth initiatives.'}`;
+        }
+        
+        // Expense-related queries
+        if (lowerQuery.includes('expense') || lowerQuery.includes('cost') || lowerQuery.includes('budget')) {
+            const expenseProjections = data.expenseProjections || {};
+            const next4Weeks = expenseProjections.next4Weeks || 0;
+            const trend = expenseProjections.weeklyTrendDirection || 'stable';
+            
+            return `**Expense Analysis:**\n\n• Next 4 Weeks Projected Expenses: LKR ${next4Weeks.toLocaleString()}\n• Weekly Trend: ${trend.toUpperCase()}\n\n**Recommendation:** ${trend === 'increasing' ? 'Monitor expense categories driving the increase for cost optimization opportunities.' : 'Current expense levels are within expected parameters.'}`;
+        }
+        
+        return null; // Fall back to default response
     };
 
     return (
@@ -165,10 +276,10 @@ export default function AIAnalyzerPage() {
                     </div>
                     <button
                         onClick={handleRunAnalysis}
-                        disabled={analyzing}
+                        disabled={analyzing || predictionsLoading}
                         className="w-full mt-6 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 transition shadow-md"
                     >
-                        {analyzing ? (
+                        {analyzing || predictionsLoading ? (
                             <>
                                 <RefreshCw className="w-4 h-4 animate-spin" />
                                 Analyzing Records...
