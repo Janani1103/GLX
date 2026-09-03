@@ -104,13 +104,28 @@ class ReportService {
                 return newRow;
             });
 
+            // Calculate column widths so the table fills the usable page width
+            const pageMarginLeft = doc.page.margins?.left ?? 30;
+            const pageMarginRight = doc.page.margins?.right ?? 30;
+            const usableWidth = doc.page.width - pageMarginLeft - pageMarginRight;
+
+            // Use provided column width hints (like Excel widths) as relative weights
+            const widthHints = columns.map(c => c.width || 20);
+            const totalHint = widthHints.reduce((s, v) => s + (v || 0), 0) || (columns.length || 1);
+
+            const headers = columns.map((c, idx) => {
+                const rel = (widthHints[idx] || 20) / totalHint;
+                return { label: c.header, property: c.key, width: Math.max(40, Math.floor(rel * usableWidth)) };
+            });
+
             const table = {
                 title: '',
-                headers: columns.map(c => ({ label: c.header, property: c.key, width: c.width || 80 })),
+                headers,
                 datas: tableData,
                 options: {
-                    padding: 5,
-                    columnSpacing: 10,
+                    width: usableWidth,
+                    padding: 6,
+                    columnSpacing: 8,
                     divider: {
                         header: { disabled: false, width: 2, opacity: 1 },
                         horizontal: { disabled: false, width: 1, opacity: 0.1 }
