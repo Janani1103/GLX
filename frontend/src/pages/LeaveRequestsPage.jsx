@@ -47,7 +47,7 @@ export default function LeaveRequestsPage() {
 
     // Advance Form State
     const [advanceForm, setAdvanceForm] = useState({
-        employeeId: '', advanceType: 'amount', requestedPercentage: 25, amount: 0, reason: '',
+        employeeId: '', advanceType: 'amount', requestedPercentage: 25, amount: '', reason: '',
     });
 
     const { data: leavesData } = useLeaves(filters);
@@ -108,7 +108,7 @@ export default function LeaveRequestsPage() {
                 amount: amt,
             });
             setIsAdvanceFormOpen(false);
-            setAdvanceForm({ employeeId: '', advanceType: 'amount', requestedPercentage: 25, amount: 0, reason: '' });
+            setAdvanceForm({ employeeId: '', advanceType: 'amount', requestedPercentage: 25, amount: '', reason: '' });
         } catch { }
     };
 
@@ -211,14 +211,16 @@ export default function LeaveRequestsPage() {
         },
         {
             key: 'actions', label: 'Actions', width: '120px', render: (r) => (
-                <div className="flex gap-1">
-                    {r.status === 'pending' && canApprove && (
+                <div className="flex gap-1 items-center">
+                    {r.status === 'pending' && canApprove ? (
                         <>
                             <button onClick={() => setAdvanceActionModal({ type: 'approve', advance: r })}
                                 className="p-1.5 hover:bg-green-50 text-green-600 rounded" title="Approve Advance"><CheckCircle size={16} /></button>
                             <button onClick={() => setAdvanceActionModal({ type: 'decline', advance: r })}
                                 className="p-1.5 hover:bg-red-50 text-red-600 rounded" title="Decline Advance"><XCircle size={16} /></button>
                         </>
+                    ) : (
+                        <span className="text-xs text-gray-400 font-medium px-2">—</span>
                     )}
                 </div>
             )
@@ -394,8 +396,8 @@ export default function LeaveRequestsPage() {
                                 value={String(advanceForm.requestedPercentage)}
                                 onChange={(e) => setAdvanceForm((f) => ({ ...f, requestedPercentage: Number(e.target.value) }))} />
                         ) : (
-                            <Input label="Advance Amount (LKR)" type="number" step="100" min="0" value={advanceForm.amount}
-                                onChange={(e) => setAdvanceForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
+                            <Input label="Advance Amount (LKR)" type="number" step="100" min="0" placeholder="0.00" value={advanceForm.amount}
+                                onChange={(e) => setAdvanceForm((f) => ({ ...f, amount: e.target.value }))} />
                         )}
                     </div>
 

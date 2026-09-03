@@ -131,6 +131,7 @@ const menuGroups = [
             { label: 'Returns & Damages', icon: RotateCcw, path: '/reports/returns-damages', permission: 'reports.sales' },
             { label: 'Financial Snapshot', icon: DollarSign, path: '/reports/financial', permission: 'reports.financial' },
             { label: 'Daily P&L Master', icon: LineChart, path: '/reports/daily-pnl', permission: 'reports.financial' },
+            { label: 'Net Profit (P&L)', icon: FileText, path: '/reports/net-profit', permission: 'reports.financial' },
             { label: 'Variance & Sales Comparator', icon: BarChart3, path: '/reports/variance-comparator', permission: 'reports.financial' },
             { label: 'HR Reports', icon: UsersIcon, path: '/reports/hr', permission: 'reports.hr' },
             { label: 'Shift Operations Logs', icon: Clock, path: '/reports/shift-wise', permission: 'reports.hr' },

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, Share2, Copy, Eye, EyeOff, ShieldCheck, Download, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -10,7 +10,7 @@ import Badge from '../components/ui/Badge';
 import { usePayslip, usePublicPayslip } from '../features/hr/useHr';
 import { useAuthStore } from '../store/authStore';
 import { useSettings } from '../features/settings/useSettings';
-import ProtectedView from '../components/security/ProtectedView';
+import { printElementAsPDF, exportElementToPDF } from '../utils/dataExport';
 
 const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
@@ -19,6 +19,7 @@ export default function PayslipDetailPage({ isPublicView = false }) {
     const { payrollId, employeeId, token } = useParams();
     const navigate = useNavigate();
     const { user } = useAuthStore();
+    const payslipRef = useRef(null);
 
     // Mode state: 'full' (Company Details) or 'short' (Without Company Name for Mobile/External Privacy)
     const [payslipMode, setPayslipMode] = useState('full'); // 'full' | 'short'
@@ -64,6 +65,20 @@ export default function PayslipDetailPage({ isPublicView = false }) {
         toast.success('Direct Payslip link copied to clipboard!');
     };
 
+    const handlePrint = () => {
+        if (payslipRef.current) {
+            printElementAsPDF(payslipRef.current);
+        } else {
+            window.print();
+        }
+    };
+
+    const handleDownloadPDF = () => {
+        if (payslipRef.current) {
+            exportElementToPDF(payslipRef.current, `PaySlip_${employee?.firstName || ps?.employeeName || 'Employee'}_${payroll?.periodMonth || ''}-${payroll?.periodYear || ''}.pdf`);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {!isPublicView && (
@@ -81,7 +96,10 @@ export default function PayslipDetailPage({ isPublicView = false }) {
                                 <Button variant="outline" onClick={copyShareLink}>
                                     <Share2 size={16} className="mr-1.5" /> Share Link
                                 </Button>
-                                <Button variant="primary" onClick={() => window.print()}>
+                                <Button variant="outline" onClick={handleDownloadPDF}>
+                                    <Download size={16} className="mr-1.5" /> Download PDF
+                                </Button>
+                                <Button variant="primary" onClick={handlePrint}>
                                     <Printer size={16} className="mr-1.5" /> PDF / Print
                                 </Button>
                             </div>
@@ -129,217 +147,182 @@ export default function PayslipDetailPage({ isPublicView = false }) {
                 </div>
             </div>
 
-            {/* Print Styles */}
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                @media print {
-                    .no-print, header, nav, aside { display: none !important; }
-                    html, body, #root, main, .space-y-6 {
-                        background: #ffffff !important;
-                        background-color: #ffffff !important;
-                        color: #000000 !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        width: 100% !important;
-                        max-width: 100% !important;
-                    }
-                    .card-print {
-                        border: none !important;
-                        box-shadow: none !important;
-                        padding: 0 !important;
-                        margin: 0 auto !important;
-                        background: #ffffff !important;
-                        background-color: #ffffff !important;
-                        width: 100% !important;
-                    }
-                    .card-print * {
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    .protected-shield-overlay, .security-watermark-overlay {
-                        display: none !important;
-                    }
-                }
-            `}} />
+            {/* Main Payslip Container - Pure White Document Print Container */}
+            <div ref={payslipRef} className="document-print-view print-container print-area bg-white p-8 max-w-3xl mx-auto rounded-xl border border-gray-200 shadow-sm relative overflow-hidden print:p-0 print:border-none print:shadow-none print:max-w-none print:w-full print:bg-white">
+                {watermarkEnabled && (
+                    <div className="no-print absolute inset-0 pointer-events-none flex items-center justify-center rotate-[-30deg] opacity-10 select-none text-red-600 font-extrabold text-5xl tracking-widest uppercase">
+                        CONFIDENTIAL · GLX ERP SECURITY
+                    </div>
+                )}
 
-            {/* Main Payslip Container */}
-            <ProtectedView title="Salary PaySlip" enableWatermark={false}>
-                <Card className={`p-8 max-w-3xl mx-auto relative overflow-hidden card-print bg-white`}>
-                    {watermarkEnabled && (
-                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center rotate-[-30deg] opacity-10 select-none text-red-600 font-extrabold text-5xl tracking-widest uppercase">
-                            CONFIDENTIAL · GLX ERP SECURITY
+                {/* Header Section */}
+                <div className="border-b-2 border-gray-900 pb-4 mb-6 flex justify-between items-start">
+                    <div>
+                        {(!hideHeaderAndSignature && payslipMode === 'full') ? (
+                            <>
+                                {systemSettings.companyLogo && (
+                                    <img src={systemSettings.companyLogo} alt="Logo" className="h-10 mb-1 object-contain" />
+                                )}
+                                <h1 className="text-2xl font-black text-gray-900 tracking-tight">{systemSettings.companyName || 'GLX INDUSTRIES (PVT) LTD'}</h1>
+                                <p className="text-xs font-semibold text-gray-600">No. 124, Heavy Industrial Zone, Sri Lanka · Reg No: PV-98741</p>
+                                <p className="text-xs text-gray-500 font-medium mt-1">Official Corporate Salary Statement</p>
+                            </>
+                        ) : (
+                            <>
+                                <h1 className="text-xl font-bold text-gray-800 tracking-tight">SALARY PAY SLIP</h1>
+                                <p className="text-xs font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded inline-block mt-1 border border-amber-200">
+                                    Confidential Pay Slip Statement
+                                </p>
+                            </>
+                        )}
+                    </div>
+                    <div className="text-right">
+                        <Badge variant="info" className="text-xs font-bold font-mono">{payroll?.payrollNumber || 'PAY-SLIP'}</Badge>
+                        <p className="text-sm font-bold text-gray-900 mt-1">{monthNames[(payroll?.periodMonth || 1) - 1]} {payroll?.periodYear}</p>
+                        <p className="text-xs text-gray-500 font-mono">
+                            {payroll?.periodStartDate ? new Date(payroll.periodStartDate).toLocaleDateString('en-LK') : ''} — {payroll?.periodEndDate ? new Date(payroll.periodEndDate).toLocaleDateString('en-LK') : ''}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Employee Info Section */}
+                <div className="grid grid-cols-2 gap-6 mb-6 p-4 bg-gray-50/70 print:bg-white rounded-xl border border-gray-200 print:border-gray-300 text-sm">
+                    <div>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Employee Details</p>
+                        <p className="font-bold text-base text-gray-900">{employee?.firstName || ps?.employeeName} {employee?.lastName || ''}</p>
+                        <p className="font-mono text-xs font-semibold text-gray-700">{employee?.employeeCode || ps?.employeeCode}</p>
+                        <p className="text-xs text-gray-600 mt-0.5">{employee?.designation || 'Staff Member'} · {employee?.department || 'Operations'}</p>
+                        <p className="text-xs text-gray-500 mt-1">Pay Basis: <span className="font-semibold capitalize">{employee?.paymentType?.replace('_', ' ') || 'Monthly'}</span></p>
+                    </div>
+                    <div>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Statutory &amp; Bank</p>
+                        <p className="text-xs">EPF No: <span className="font-mono font-semibold">{employee?.epfNumber || 'EPF-PENDING'}</span></p>
+                        <p className="text-xs">Bank: <span className="font-semibold">{employee?.bankDetails?.bankName || 'Direct Cash / Bank'}</span></p>
+                        <p className="text-xs">Account: <span className="font-mono">{employee?.bankDetails?.accountNumber || '—'}</span></p>
+                    </div>
+                </div>
+
+                {/* Attendance Summary */}
+                <div className="mb-6 border border-gray-200 print:border-gray-300 rounded-lg p-3 bg-gray-50/40 print:bg-white">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Attendance Summary</p>
+                    <div className="grid grid-cols-6 gap-2 text-center text-xs">
+                        <div className="p-1 bg-white rounded border border-gray-200 print:border-gray-300"><p className="text-gray-500">Working</p><p className="font-bold">{ps?.workingDays || 0}</p></div>
+                        <div className="p-1 bg-white rounded border border-gray-200 print:border-gray-300"><p className="text-gray-500">Present</p><p className="font-bold text-emerald-700">{ps?.daysPresent || 0}</p></div>
+                        <div className="p-1 bg-white rounded border border-gray-200 print:border-gray-300"><p className="text-gray-500">Absent</p><p className="font-bold text-red-600">{ps?.daysAbsent || 0}</p></div>
+                        <div className="p-1 bg-white rounded border border-gray-200 print:border-gray-300"><p className="text-gray-500">Leave</p><p className="font-bold text-blue-600">{ps?.leaveDays || 0}</p></div>
+                        <div className="p-1 bg-white rounded border border-gray-200 print:border-gray-300"><p className="text-gray-500">Uninformed</p><p className="font-bold text-amber-600">{ps?.uninformedLeaveDays || 0}</p></div>
+                        <div className="p-1 bg-white rounded border border-gray-200 print:border-gray-300"><p className="text-gray-500">OT Hrs</p><p className="font-bold">{ps?.overtimeHours || 0}</p></div>
+                    </div>
+                </div>
+
+                {/* Earnings & Deductions Breakdown */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    {/* Earnings */}
+                    <div className="border border-emerald-200 print:border-gray-300 rounded-xl p-4 bg-emerald-50/20 print:bg-white">
+                        <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center justify-between">
+                            <span>Earnings (ලැබීම්)</span>
+                            <span className="text-xs">LKR</span>
+                        </p>
+                        <table className="w-full text-sm">
+                            <tbody>
+                                <tr className="border-b border-gray-100">
+                                    <td className="py-1 text-gray-700">Basic Wage / Salary</td>
+                                    <td className="py-1 text-right font-medium">{fmt(ps?.basicSalary)}</td>
+                                </tr>
+                                {ps?.earnings?.map((e, i) => (
+                                    <tr key={i} className="border-b border-gray-100">
+                                        <td className="py-1 text-gray-700">{e.name}</td>
+                                        <td className="py-1 text-right font-medium">{fmt(e.amount)}</td>
+                                    </tr>
+                                ))}
+                                <tr className="font-bold text-emerald-900 border-t border-emerald-300 pt-2">
+                                    <td className="py-2">Gross Earnings</td>
+                                    <td className="py-2 text-right">{fmt(ps?.grossEarnings)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Deductions */}
+                    <div className="border border-rose-200 print:border-gray-300 rounded-xl p-4 bg-rose-50/20 print:bg-white">
+                        <p className="text-xs font-bold text-rose-800 uppercase tracking-wider mb-2 flex items-center justify-between">
+                            <span>Deductions (අඩු කිරීම්)</span>
+                            <span className="text-xs">LKR</span>
+                        </p>
+                        <table className="w-full text-sm">
+                            <tbody>
+                                {ps?.epfEmployeeContribution > 0 && (
+                                    <tr className="border-b border-gray-100">
+                                        <td className="py-1 text-gray-700">EPF Employee (8%)</td>
+                                        <td className="py-1 text-right text-rose-600">-{fmt(ps.epfEmployeeContribution)}</td>
+                                    </tr>
+                                )}
+                                {ps?.advanceDeducted > 0 && (
+                                    <tr className="border-b border-gray-100 bg-amber-50/50 print:bg-white">
+                                        <td className="py-1 font-semibold text-amber-900">Salary Advance Deducted</td>
+                                        <td className="py-1 text-right font-bold text-amber-700">-{fmt(ps.advanceDeducted)}</td>
+                                    </tr>
+                                )}
+                                {ps?.deductions?.map((d, i) => (
+                                    <tr key={i} className="border-b border-gray-100">
+                                        <td className="py-1 text-gray-700">{d.name}</td>
+                                        <td className="py-1 text-right text-rose-600">-{fmt(d.amount)}</td>
+                                    </tr>
+                                ))}
+                                <tr className="font-bold text-rose-900 border-t border-rose-300 pt-2">
+                                    <td className="py-2">Total Deductions</td>
+                                    <td className="py-2 text-right text-rose-600">-{fmt(ps?.totalDeductions)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Net Pay Box */}
+                <div className="mt-6 p-4 rounded-xl bg-gray-900 text-white print:bg-white print:border-2 print:border-gray-900 print:text-gray-900 flex flex-wrap justify-between items-center gap-4">
+                    <div>
+                        <p className="text-xs font-semibold text-gray-400 print:text-gray-600 uppercase tracking-wider">NET SALARY PAYABLE</p>
+                        <p className="text-3xl font-black text-emerald-400 print:text-emerald-700">{fmt(ps?.netPay)}</p>
+                    </div>
+                    <div className="text-right text-xs text-gray-300 print:text-gray-700 space-y-0.5 border-l border-gray-700 print:border-gray-300 pl-4">
+                        <p>EPF Employer Contribution (12%): <span className="font-semibold text-white print:text-gray-900">{fmt(ps?.epfEmployerContribution)}</span></p>
+                        <p>ETF Employer Contribution (3%): <span className="font-semibold text-white print:text-gray-900">{fmt(ps?.etfContribution)}</span></p>
+                    </div>
+                </div>
+
+                {/* Signatures & Authorization Footer */}
+                <div className="mt-10 pt-6 border-t border-dashed border-gray-300 flex justify-between items-end text-xs">
+                    <div>
+                        <p className="font-semibold text-gray-600 mb-8">Employee Signature:</p>
+                        <div className="border-t border-gray-400 w-44"></div>
+                        <p className="text-[11px] font-medium text-gray-700 mt-1">{employee?.firstName || ps?.employeeName} {employee?.lastName || ''}</p>
+                    </div>
+
+                    {!hideHeaderAndSignature && (
+                        <div className="text-right flex flex-col items-end">
+                            <p className="font-semibold text-gray-600 mb-1">Approved &amp; Authorized By:</p>
+                            {bossSignatureUrl ? (
+                                <img src={bossSignatureUrl} alt="Boss Signature" className="h-12 max-w-[180px] object-contain mb-1" />
+                            ) : (
+                                <div className="h-10 w-44 border border-dashed border-gray-300 rounded flex items-center justify-center text-[10px] text-gray-400 my-1">
+                                    [ Boss Signature ]
+                                </div>
+                            )}
+                            <div className="border-t border-gray-400 w-48 mt-1"></div>
+                            <p className="text-[11px] font-bold text-gray-900 mt-0.5">{bossTitle}</p>
+                            <p className="text-[10px] text-gray-500">{systemSettings.companyName || 'GLX Industries (Pvt) Ltd'}</p>
                         </div>
                     )}
+                </div>
 
-                    {/* Header Section */}
-                    <div className="border-b-2 border-gray-900 pb-4 mb-6 flex justify-between items-start">
-                        <div>
-                            {(!hideHeaderAndSignature && payslipMode === 'full') ? (
-                                <>
-                                    {systemSettings.companyLogo && (
-                                        <img src={systemSettings.companyLogo} alt="Logo" className="h-10 mb-1 object-contain" />
-                                    )}
-                                    <h1 className="text-2xl font-black text-gray-900 tracking-tight">{systemSettings.companyName || 'GLX INDUSTRIES (PVT) LTD'}</h1>
-                                    <p className="text-xs font-semibold text-gray-600">No. 124, Heavy Industrial Zone, Sri Lanka · Reg No: PV-98741</p>
-                                    <p className="text-xs text-gray-500 font-medium mt-1">Official Corporate Salary Statement</p>
-                                </>
-                            ) : (
-                                <>
-                                    <h1 className="text-xl font-bold text-gray-800 tracking-tight">SALARY PAY SLIP</h1>
-                                    <p className="text-xs font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded inline-block mt-1 border border-amber-200">
-                                        Confidential Pay Slip Statement
-                                    </p>
-                                </>
-                            )}
-                        </div>
-                        <div className="text-right">
-                            <Badge variant="info" className="text-xs font-bold font-mono">{payroll?.payrollNumber || 'PAY-SLIP'}</Badge>
-                            <p className="text-sm font-bold text-gray-900 mt-1">{monthNames[(payroll?.periodMonth || 1) - 1]} {payroll?.periodYear}</p>
-                            <p className="text-xs text-gray-500 font-mono">
-                                {payroll?.periodStartDate ? new Date(payroll.periodStartDate).toLocaleDateString('en-LK') : ''} — {payroll?.periodEndDate ? new Date(payroll.periodEndDate).toLocaleDateString('en-LK') : ''}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Employee Info Section */}
-                    <div className="grid grid-cols-2 gap-6 mb-6 p-4 bg-gray-50/70 rounded-xl border text-sm">
-                        <div>
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Employee Details</p>
-                            <p className="font-bold text-base text-gray-900">{employee?.firstName || ps?.employeeName} {employee?.lastName || ''}</p>
-                            <p className="font-mono text-xs font-semibold text-gray-700">{employee?.employeeCode || ps?.employeeCode}</p>
-                            <p className="text-xs text-gray-600 mt-0.5">{employee?.designation || 'Staff Member'} · {employee?.department || 'Operations'}</p>
-                            <p className="text-xs text-gray-500 mt-1">Pay Basis: <span className="font-semibold capitalize">{employee?.paymentType?.replace('_', ' ') || 'Monthly'}</span></p>
-                        </div>
-                        <div>
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Statutory &amp; Bank</p>
-                            <p className="text-xs">EPF No: <span className="font-mono font-semibold">{employee?.epfNumber || 'EPF-PENDING'}</span></p>
-                            <p className="text-xs">Bank: <span className="font-semibold">{employee?.bankDetails?.bankName || 'Direct Cash / Bank'}</span></p>
-                            <p className="text-xs">Account: <span className="font-mono">{employee?.bankDetails?.accountNumber || '—'}</span></p>
-                        </div>
-                    </div>
-
-                    {/* Attendance Summary */}
-                    <div className="mb-6 border rounded-lg p-3 bg-gray-50/40">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Attendance Summary</p>
-                        <div className="grid grid-cols-6 gap-2 text-center text-xs">
-                            <div className="p-1 bg-white rounded border"><p className="text-gray-500">Working</p><p className="font-bold">{ps?.workingDays || 0}</p></div>
-                            <div className="p-1 bg-white rounded border"><p className="text-gray-500">Present</p><p className="font-bold text-emerald-700">{ps?.daysPresent || 0}</p></div>
-                            <div className="p-1 bg-white rounded border"><p className="text-gray-500">Absent</p><p className="font-bold text-red-600">{ps?.daysAbsent || 0}</p></div>
-                            <div className="p-1 bg-white rounded border"><p className="text-gray-500">Leave</p><p className="font-bold text-blue-600">{ps?.leaveDays || 0}</p></div>
-                            <div className="p-1 bg-white rounded border"><p className="text-gray-500">Uninformed</p><p className="font-bold text-amber-600">{ps?.uninformedLeaveDays || 0}</p></div>
-                            <div className="p-1 bg-white rounded border"><p className="text-gray-500">OT Hrs</p><p className="font-bold">{ps?.overtimeHours || 0}</p></div>
-                        </div>
-                    </div>
-
-                    {/* Earnings & Deductions Breakdown */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        {/* Earnings */}
-                        <div className="border rounded-xl p-4 bg-emerald-50/20">
-                            <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center justify-between">
-                                <span>Earnings (ලැබීම්)</span>
-                                <span className="text-xs">LKR</span>
-                            </p>
-                            <table className="w-full text-sm">
-                                <tbody>
-                                    <tr className="border-b border-gray-100">
-                                        <td className="py-1 text-gray-700">Basic Wage / Salary</td>
-                                        <td className="py-1 text-right font-medium">{fmt(ps?.basicSalary)}</td>
-                                    </tr>
-                                    {ps?.earnings?.map((e, i) => (
-                                        <tr key={i} className="border-b border-gray-100">
-                                            <td className="py-1 text-gray-700">{e.name}</td>
-                                            <td className="py-1 text-right font-medium">{fmt(e.amount)}</td>
-                                        </tr>
-                                    ))}
-                                    <tr className="font-bold text-emerald-900 border-t border-emerald-300 pt-2">
-                                        <td className="py-2">Gross Earnings</td>
-                                        <td className="py-2 text-right">{fmt(ps?.grossEarnings)}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Deductions */}
-                        <div className="border rounded-xl p-4 bg-rose-50/20">
-                            <p className="text-xs font-bold text-rose-800 uppercase tracking-wider mb-2 flex items-center justify-between">
-                                <span>Deductions (අඩු කිරීම්)</span>
-                                <span className="text-xs">LKR</span>
-                            </p>
-                            <table className="w-full text-sm">
-                                <tbody>
-                                    {ps?.epfEmployeeContribution > 0 && (
-                                        <tr className="border-b border-gray-100">
-                                            <td className="py-1 text-gray-700">EPF Employee (8%)</td>
-                                            <td className="py-1 text-right text-rose-600">-{fmt(ps.epfEmployeeContribution)}</td>
-                                        </tr>
-                                    )}
-                                    {ps?.advanceDeducted > 0 && (
-                                        <tr className="border-b border-gray-100 bg-amber-50/50">
-                                            <td className="py-1 font-semibold text-amber-900">Salary Advance Deducted</td>
-                                            <td className="py-1 text-right font-bold text-amber-700">-{fmt(ps.advanceDeducted)}</td>
-                                        </tr>
-                                    )}
-                                    {ps?.deductions?.map((d, i) => (
-                                        <tr key={i} className="border-b border-gray-100">
-                                            <td className="py-1 text-gray-700">{d.name}</td>
-                                            <td className="py-1 text-right text-rose-600">-{fmt(d.amount)}</td>
-                                        </tr>
-                                    ))}
-                                    <tr className="font-bold text-rose-900 border-t border-rose-300 pt-2">
-                                        <td className="py-2">Total Deductions</td>
-                                        <td className="py-2 text-right text-rose-600">-{fmt(ps?.totalDeductions)}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* Net Pay Box */}
-                    <div className="mt-6 p-4 rounded-xl bg-gray-900 text-white flex flex-wrap justify-between items-center gap-4">
-                        <div>
-                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">NET SALARY PAYABLE</p>
-                            <p className="text-3xl font-black text-emerald-400">{fmt(ps?.netPay)}</p>
-                        </div>
-                        <div className="text-right text-xs text-gray-300 space-y-0.5 border-l border-gray-700 pl-4">
-                            <p>EPF Employer Contribution (12%): <span className="font-semibold text-white">{fmt(ps?.epfEmployerContribution)}</span></p>
-                            <p>ETF Employer Contribution (3%): <span className="font-semibold text-white">{fmt(ps?.etfContribution)}</span></p>
-                        </div>
-                    </div>
-
-                    {/* Signatures & Authorization Footer */}
-                    <div className="mt-10 pt-6 border-t border-dashed border-gray-300 flex justify-between items-end text-xs">
-                        <div>
-                            <p className="font-semibold text-gray-600 mb-8">Employee Signature:</p>
-                            <div className="border-t border-gray-400 w-44"></div>
-                            <p className="text-[11px] font-medium text-gray-700 mt-1">{employee?.firstName || ps?.employeeName} {employee?.lastName || ''}</p>
-                        </div>
-
-                        {!hideHeaderAndSignature && (
-                            <div className="text-right flex flex-col items-end">
-                                <p className="font-semibold text-gray-600 mb-1">Approved &amp; Authorized By:</p>
-                                {bossSignatureUrl ? (
-                                    <img src={bossSignatureUrl} alt="Boss Signature" className="h-12 max-w-[180px] object-contain mb-1" />
-                                ) : (
-                                    <div className="h-10 w-44 border border-dashed border-gray-300 rounded flex items-center justify-center text-[10px] text-gray-400 my-1">
-                                        [ Boss Signature ]
-                                    </div>
-                                )}
-                                <div className="border-t border-gray-400 w-48 mt-1"></div>
-                                <p className="text-[11px] font-bold text-gray-900 mt-0.5">{bossTitle}</p>
-                                <p className="text-[10px] text-gray-500">{systemSettings.companyName || 'GLX Industries (Pvt) Ltd'}</p>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="mt-6 pt-4 border-t text-center text-xs text-gray-500">
-                        {(!hideHeaderAndSignature && payslipMode === 'full') ? (
-                            <p>This is an official system-generated corporate payslip of GLX Industries.</p>
-                        ) : (
-                            <p>Discreet / Mobile Pay Slip — Company Details hidden for privacy.</p>
-                        )}
-                    </div>
-                </Card>
-            </ProtectedView>
+                <div className="mt-6 pt-4 border-t text-center text-xs text-gray-500">
+                    {(!hideHeaderAndSignature && payslipMode === 'full') ? (
+                        <p>This is an official system-generated corporate payslip of GLX Industries.</p>
+                    ) : (
+                        <p>Discreet / Mobile Pay Slip — Company Details hidden for privacy.</p>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

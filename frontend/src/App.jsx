@@ -259,7 +259,7 @@ function App() {
         <Route path="/reports/variance-comparator" element={<ProtectedRoute requiredPermission="reports.financial"><VarianceComparisonPage /></ProtectedRoute>} />
         <Route path="/reports/hr" element={<ProtectedRoute requiredPermission="reports.hr"><HrReportsPage /></ProtectedRoute>} />
         <Route path="/reports/shift-wise" element={<ProtectedRoute requiredPermission="reports.hr"><ShiftReportingPage /></ProtectedRoute>} />
-        <Route path="/reports/predictions" element={<ProtectedRoute requiredPermission="reports.sales"><FuturePredictionsPage /></ProtectedRoute>} />
+        <Route path="/reports/predictions" element={<ProtectedRoute requiredAnyPermission={['reports.sales', 'reports.financial', 'reports.inventory', 'reports.production']}><FuturePredictionsPage /></ProtectedRoute>} />
 
         {/* Admin only */}
         <Route path="/users" element={<ProtectedRoute requiredPermission="admin.users.view"><UsersPage /></ProtectedRoute>} />

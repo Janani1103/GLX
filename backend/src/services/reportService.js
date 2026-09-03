@@ -69,6 +69,7 @@ class ReportService {
     async generatePDF({ title, columns, data, user }) {
         return new Promise((resolve, reject) => {
             const doc = new PdfPrinter({
+                bufferPages: true,
                 margin: 30,
                 size: columns.length > 7 ? 'A4' : 'A4',
                 layout: columns.length > 7 ? 'landscape' : 'portrait'
@@ -125,12 +126,15 @@ class ReportService {
                 const range = doc.bufferedPageRange();
                 for (let i = range.start; i < range.start + range.count; i++) {
                     doc.switchToPage(i);
+                    const oldBottomMargin = doc.page.margins.bottom;
+                    doc.page.margins.bottom = 0;
                     doc.fontSize(8).fillColor('#94A3B8').text(
                         `Page ${i + 1} of ${range.count}`,
                         0,
                         doc.page.height - 20,
-                        { align: 'center', width: doc.page.width }
+                        { align: 'center', width: doc.page.width, lineBreak: false }
                     );
+                    doc.page.margins.bottom = oldBottomMargin;
                 }
                 doc.end();
             }
