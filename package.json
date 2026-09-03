@@ -1,0 +1,26 @@
+{
+  "name": "glx-monorepo",
+  "version": "1.0.0",
+  "description": "Root package.json for GLX Industries Unified ERP & Showcase System",
+  "private": true,
+  "scripts": {
+    "install-backend": "npm install --prefix backend",
+    "install-frontend": "npm install --prefix frontend",
+    "install-showcase": "npm install --prefix showcase-web",
+    "install-all": "npm run install-backend && npm run install-frontend && npm run install-showcase",
+    "build-frontend": "npm run build --prefix frontend",
+    "sync-erp": "node -e \"const fs=require('fs'); if(fs.existsSync('showcase-web/public/erp')) fs.rmSync('showcase-web/public/erp', {recursive:true, force:true}); fs.cpSync('frontend/dist', 'showcase-web/public/erp', {recursive:true}); console.log('ERP synced to showcase-web/public/erp');\"",
+    "build-showcase": "npm run build --prefix showcase-web",
+    "build": "npm run build-frontend && npm run sync-erp && npm run build-showcase",
+    "start": "npm start --prefix showcase-web",
+    "dev-backend": "npm run dev --prefix backend",
+    "dev-frontend": "npm run dev --prefix frontend",
+    "dev-showcase": "npm run dev --prefix showcase-web",
+    "dev:system": "concurrently -n \"BACKEND,ERP-SYSTEM\" -c \"blue,green\" \"npm run dev-backend\" \"npm run dev-frontend\"",
+    "dev:all": "concurrently -n \"BACKEND,SHOWCASE-WEB\" -c \"blue,yellow\" \"npm run dev-backend\" \"npm run dev-showcase\"",
+    "dev": "npm run dev-showcase"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+*/node_modules/
+package-lock.json
+
+# Next.js Build Output
+.next/
+*/.next/
+out/
+*/out/
+
+# Vite / React Build Output
+dist/
+*/dist/
+build/
+*/build/
+
+# Archives & Big Files
+*.rar
+*.zip
+*.tar.gz
+*.7z
+
+# Environment Variables
+.env
+.env*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# OS Metadata
+.DS_Store
+Thumbs.db

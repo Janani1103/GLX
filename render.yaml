@@ -1,0 +1,70 @@
+services:
+  # 🌐 1. GLX Showcase Website & Unified Admin Portal (Next.js 14)
+  - type: web
+    name: glx-showcase-web
+    env: node
+    plan: free
+    region: oregon
+    rootDir: showcase-web
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.17.0
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: MONGO_URI
+        value: mongodb+srv://dilumvishvajith18_db_user:QXmQU7Ykq23FPqIE@cluster0.avlawz8.mongodb.net/glx_industries?retryWrites=true&w=majority
+      - key: ADMIN_SECRET_PIN
+        value: glx2026
+      - key: NEXT_PUBLIC_COMPANY_NAME
+        value: GLX Industries (Pvt) Ltd
+      - key: NEXT_PUBLIC_COMPANY_PHONE
+        value: "+94 77 226 8608"
+      - key: NEXT_PUBLIC_COMPANY_WHATSAPP
+        value: "+94772268608"
+      - key: SMS_USER_ID
+        value: glx_admin
+      - key: SMS_API_KEY
+        value: mock_dev_key
+      - key: SMS_SENDER_ID
+        value: GLXINDUST
+      - key: SMS_GATEWAY_URL
+        value: https://smslenz.lk/api/send-sms
+      - key: SMS_ALERT_RECIPIENT
+        value: "+94772268608"
+
+  # ⚙️ 2. GLX Factory ERP Backend API (Node Express & MongoDB)
+  - type: web
+    name: glx-backend-api
+    env: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node src/server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20.17.0
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGO_URI
+        value: mongodb+srv://dilumvishvajith18_db_user:QXmQU7Ykq23FPqIE@cluster0.avlawz8.mongodb.net/glx_industries?retryWrites=true&w=majority
+      - key: JWT_SECRET
+        value: glx_industries_super_secret_jwt_key_2026_production
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: SMS_USER_ID
+        value: glx_admin
+      - key: SMS_API_KEY
+        value: mock_dev_key
+      - key: SMS_SENDER_ID
+        value: GLXINDUST
+      - key: SMS_GATEWAY_URL
+        value: https://smslenz.lk/api/send-sms
+      - key: SMS_ALERT_RECIPIENT
+        value: "+94772268608"
