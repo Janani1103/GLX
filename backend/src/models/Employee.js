@@ -21,10 +21,11 @@ const employeeSchema = new mongoose.Schema({
     religion: String,
     bloodGroup: String,
 
-    // Contact (Mandatory 2 Contact Numbers)
+    // Contact (Mandatory 3 Contact Numbers)
     email: { type: String, lowercase: true, trim: true },
     phone: String,          // Contact Number 1
     secondaryPhone: String, // Contact Number 2
+    tertiaryPhone: String,  // Contact Number 3
     mobile: String,
     permanentAddress: {
         line1: String, line2: String, city: String, state: String,

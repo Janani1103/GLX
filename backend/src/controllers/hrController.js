@@ -93,6 +93,11 @@ export const deleteDesignation = asyncHandler(async (req, res) => {
 // ============================================================
 
 export const createEmployee = asyncHandler(async (req, res) => {
+    if (!req.body.phone || !req.body.secondaryPhone || !req.body.tertiaryPhone) {
+        res.status(400);
+        throw new Error('Three contact numbers are required for every employee.');
+    }
+
     let linkedUserId = req.body.userId || null;
 
     if (req.body.createLogin) {
@@ -250,6 +255,11 @@ export const updateEmployee = asyncHandler(async (req, res) => {
     if (!existingEmp) {
         res.status(404);
         throw new Error('Employee not found');
+    }
+
+    if (!req.body.phone || !req.body.secondaryPhone || !req.body.tertiaryPhone) {
+        res.status(400);
+        throw new Error('Three contact numbers are required for every employee.');
     }
 
     let linkedUserId = existingEmp.userId;

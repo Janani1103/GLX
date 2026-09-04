@@ -16,7 +16,7 @@ import {
 
 const tabs = [
     { id: 'basic', label: 'Basic Info' },
-    { id: 'contact', label: 'Contact Details (සම්බන්ධ කරගන්නා අංක 2)' },
+    { id: 'contact', label: 'Contact Details (සම්බන්ධ කරගන්නා අංක 3)' },
     { id: 'employment', label: 'Employment' },
     { id: 'user_login', label: 'System Login (ලොගින් ගිණුම)' },
     { id: 'documents', label: 'Documents (අවශ්‍ය ලේඛන)' },
@@ -42,7 +42,7 @@ export default function EmployeeFormPage() {
     const [form, setForm] = useState({
         firstName: '', lastName: '', gender: '', dateOfBirth: '', nationalIdNumber: '',
         maritalStatus: '', nationality: 'Sri Lankan', bloodGroup: '',
-        email: '', phone: '', secondaryPhone: '', mobile: '',
+        email: '', phone: '', secondaryPhone: '', tertiaryPhone: '', mobile: '',
         permanentAddress: { line1: '', city: '', postalCode: '' },
         currentAddress: { line1: '', city: '', postalCode: '' },
         emergencyContact: { name: '', relationship: '', phone: '' },
@@ -80,7 +80,7 @@ export default function EmployeeFormPage() {
                 nationalIdNumber: e.nationalIdNumber || '',
                 maritalStatus: e.maritalStatus || '', nationality: e.nationality || 'Sri Lankan',
                 bloodGroup: e.bloodGroup || '',
-                email: e.email || '', phone: e.phone || '', secondaryPhone: e.secondaryPhone || '', mobile: e.mobile || '',
+                email: e.email || '', phone: e.phone || '', secondaryPhone: e.secondaryPhone || '', tertiaryPhone: e.tertiaryPhone || '', mobile: e.mobile || '',
                 permanentAddress: e.permanentAddress || { line1: '', city: '', postalCode: '' },
                 currentAddress: e.currentAddress || { line1: '', city: '', postalCode: '' },
                 emergencyContact: e.emergencyContact || { name: '', relationship: '', phone: '' },
@@ -156,8 +156,8 @@ export default function EmployeeFormPage() {
             setTab('basic');
             return;
         }
-        if (!form.phone || !form.secondaryPhone) {
-            toast.error('සෑම සේවකයෙකුගෙන්ම දුරකථන අංක 2ක් (Contact 1 & Contact 2) ඇතුළත් කිරීම අනිවාර්ය වේ!');
+        if (!form.phone || !form.secondaryPhone || !form.tertiaryPhone) {
+            toast.error('සෑම සේවකයෙකුගෙන්ම දුරකථන අංක 3ක් (Contact 1, Contact 2 & Contact 3) ඇතුළත් කිරීම අනිවාර්ය වේ!');
             setTab('contact');
             return;
         }
@@ -257,11 +257,12 @@ export default function EmployeeFormPage() {
                     {tab === 'contact' && (
                         <>
                             <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs sm:text-sm text-amber-900 mb-2">
-                                📌 <strong>අවශ්‍යයි (Requirement):</strong> සෑම සේවකයෙකුගෙන්ම දුරකථන අංක 2ක් (Contact Number 1 සහ Contact Number 2) ඇතුළත් කිරීම අනිවාර්ය වේ.
+                                📌 <strong>අවශ්‍යයි (Requirement):</strong> සෑම සේවකයෙකුගෙන්ම දුරකථන අංක 3ක් (Contact Number 1, Contact Number 2 සහ Contact Number 3) ඇතුළත් කිරීම අනිවාර්ය වේ.
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                                 <Input label="Primary Phone (සම්බන්ධ කරගන්නා අංකය 1)" required placeholder="e.g. 0771234567" value={form.phone} onChange={(e) => update('phone', e.target.value)} />
                                 <Input label="Secondary Phone (සම්බන්ධ කරගන්නා අංකය 2)" required placeholder="e.g. 0719876543" value={form.secondaryPhone} onChange={(e) => update('secondaryPhone', e.target.value)} />
+                                <Input label="Third Phone (සම්බන්ධ කරගන්නා අංකය 3)" required placeholder="e.g. 0764567890" value={form.tertiaryPhone} onChange={(e) => update('tertiaryPhone', e.target.value)} />
                                 <Input label="Email Address" type="email" value={form.email} onChange={(e) => update('email', e.target.value)} />
                             </div>
                             <div>

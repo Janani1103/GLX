@@ -62,7 +62,7 @@ export default function EmployeeDetailPage() {
                     <Card className="p-6">
                         <div className="flex items-center gap-2 mb-4">
                             <Mail size={18} className="text-gray-600" />
-                            <h3 className="text-sm font-semibold">Contact Details (සම්බන්ධ කරගන්නා අංක 2)</h3>
+                            <h3 className="text-sm font-semibold">Contact Details (සම්බන්ධ කරගන්නා අංක 3)</h3>
                         </div>
                         <div className="space-y-3 text-sm">
                             <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
@@ -72,6 +72,10 @@ export default function EmployeeDetailPage() {
                             <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
                                 <span className="text-gray-600 font-medium">Contact 2 (Secondary)</span>
                                 <span className="font-semibold text-gray-900"><Phone size={12} className="inline mr-1" />{emp.secondaryPhone || '—'}</span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                <span className="text-gray-600 font-medium">Contact 3</span>
+                                <span className="font-semibold text-gray-900"><Phone size={12} className="inline mr-1" />{emp.tertiaryPhone || '—'}</span>
                             </div>
                             {emp.email && <p><Mail size={12} className="inline mr-2 text-gray-500" />{emp.email}</p>}
                             {emp.permanentAddress?.line1 && (
