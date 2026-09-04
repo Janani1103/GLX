@@ -93,24 +93,6 @@ export default function AIAnalyzerPage() {
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
 
-    // Update results when predictions data is loaded
-    useEffect(() => {
-        if (predictionsData?.data && !predictionsLoading) {
-            updateResultsWithRealData(predictionsData.data);
-        }
-    }, [predictionsData, predictionsLoading, updateResultsWithRealData]);
-
-    const handleRunAnalysis = () => {
-        setAnalyzing(true);
-        refetchPredictions();
-        setTimeout(() => {
-            if (predictionsData?.data) {
-                updateResultsWithRealData(predictionsData.data);
-            }
-            setAnalyzing(false);
-        }, 1200);
-    };
-
     const updateResultsWithRealData = useCallback((data) => {
         const stockDepletion = data.stockDepletion || [];
         const criticalItems = stockDepletion.filter(item => item.riskLevel === 'critical').slice(0, 3);
@@ -154,6 +136,24 @@ export default function AIAnalyzerPage() {
 
         setResults(moduleResults);
     }, [selectedModule]);
+
+    // Update results when predictions data is loaded
+    useEffect(() => {
+        if (predictionsData?.data && !predictionsLoading) {
+            updateResultsWithRealData(predictionsData.data);
+        }
+    }, [predictionsData, predictionsLoading, updateResultsWithRealData]);
+
+    const handleRunAnalysis = () => {
+        setAnalyzing(true);
+        refetchPredictions();
+        setTimeout(() => {
+            if (predictionsData?.data) {
+                updateResultsWithRealData(predictionsData.data);
+            }
+            setAnalyzing(false);
+        }, 1200);
+    };
 
     const handleSendMessage = (textToSend) => {
         const query = textToSend || chatInput;
